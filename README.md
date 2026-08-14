@@ -1,7 +1,7 @@
 # AppCidade+
 > Aplicativo de Relato de Incidentes Urbanos | Urban Incident Reporting App
 
-**Equipe:** Ana Carolina dos Santos Sabino | Carlos Eduardo da Silva Santos | Caio Henrique Cid Rodrigues Cunha
+**Equipe:** Ana Carolina dos Santos Sabino | Carlos Eduardo da Silva Santos | Caio Henrique Cid Rodrigues Cunha | Pamella Sotomayor
 
 **Público-alvo:** Cidadãos do município de Santos/SP
 

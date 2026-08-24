@@ -1,0 +1,109 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+dist/
+build/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors / IDEs
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# Expo / React Native
+.expo/
+.expo-shared/
+web-build/
+expo-env.d.ts
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Native builds
+*.apk
+*.aab
+*.ipa
+
+# Android
+apps/mobile/android/app/build/
+apps/mobile/android/build/
+apps/mobile/android/.gradle/
+apps/mobile/android/local.properties
+apps/mobile/android/.idea/
+*.iml
+
+# iOS
+apps/mobile/ios/Pods/
+apps/mobile/ios/build/
+apps/mobile/ios/DerivedData/
+apps/mobile/ios/*.xcworkspace
+!apps/mobile/ios/*.xcworkspace/contents.xcworkspacedata
+*.xcuserstate
+*.xcuserdata/
+
+# Metro / bundler cache
+.metro-health-check*
+*.jsbundle
+
+# Docker
+docker-data/
+*.pid
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Cache
+.cache/
+.turbo/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+.tmp/
+tmp/
+temp/
+
+# EAS / Expo updates
+dist/
+eas-update-*/
+.eas/
+
+# Sentry
+.sentryclirc
+
+# Misc
+*.pem
+.vercel
+.railway

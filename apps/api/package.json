@@ -1,0 +1,29 @@
+{
+  "name": "@cidade-plus/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "API Fastify do Cidade+",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.1",
+    "@prisma/client": "^6.14.0",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^16.6.1",
+    "fastify": "^5.4.0",
+    "jsonwebtoken": "^9.0.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.17.1",
+    "tsx": "^4.20.3",
+    "typescript": "~5.9.2"
+  }
+}

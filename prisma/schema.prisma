@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CITIZEN
+  MANAGER
+  ADMIN
+}
+
+enum OccurrenceStatus {
+  REPORTADA
+  RECEBIDA
+  EM_ANALISE
+  EM_ATENDIMENTO
+  RESOLVIDA
+  ARQUIVADA
+  INVALIDA
+}
+
+enum EvaluationType {
+  UTIL
+  PERSISTE
+  INCORRETA
+}
+
+/// Cidadão, gestor ou admin. Senha apenas como passwordHash.
+model User {
+  id                   String   @id @default(uuid())
+  email                String   @unique
+  passwordHash         String
+  name                 String
+  /// CPF apenas com dígitos. Não expor em endpoints públicos.
+  cpf                  String   @unique @db.VarChar(11)
+  role                 Role     @default(CITIZEN)
+  reputationScore      Int      @default(0)
+  /// CEP residencial (8 dígitos), usado para determinar o bairro.
+  cep                  String   @db.VarChar(8)
+  /// Nome do bairro retornado/normalizado no cadastro (exibição).
+  neighborhood         String
+  /// Polígono oficial usado no geofencing. Não aceitar bairro livre do client.
+  santosNeighborhoodId String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  santosNeighborhood SantosNeighborhood?       @relation(fields: [santosNeighborhoodId], references: [id])
+  occurrences        Occurrence[]
+  evaluations        Evaluation[]
+  statusChanges      OccurrenceStatusHistory[]
+
+  @@index([santosNeighborhoodId])
+  @@map("users")
+}
+
+model Category {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  occurrences Occurrence[]
+
+  @@map("categories")
+}
+
+/// Ocorrência urbana. Foto obrigatória e geofencing são regras de aplicação (ETAPAS 7–8).
+model Occurrence {
+  id          String           @id @default(uuid())
+  title       String           @db.VarChar(200)
+  description String           @db.VarChar(500)
+  latitude    Decimal          @db.Decimal(9, 6)
+  longitude   Decimal          @db.Decimal(9, 6)
+  status      OccurrenceStatus @default(REPORTADA)
+  categoryId  String
+  userId      String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  category      Category                  @relation(fields: [categoryId], references: [id])
+  user          User                      @relation(fields: [userId], references: [id])
+  media         OccurrenceMedia[]
+  evaluations   Evaluation[]
+  statusHistory OccurrenceStatusHistory[]
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([status])
+  @@map("occurrences")
+}
+
+/// url = original protegida; thumbnailUrl = visualização pública; publicId = Cloudinary.
+model OccurrenceMedia {
+  id           String   @id @default(uuid())
+  occurrenceId String
+  url          String
+  thumbnailUrl String
+  publicId     String   @unique
+  createdAt    DateTime @default(now())
+
+  occurrence Occurrence @relation(fields: [occurrenceId], references: [id], onDelete: Cascade)
+
+  @@index([occurrenceId])
+  @@map("occurrence_media")
+}
+
+/// Bairros de Santos. geom em SRID 4326; comparação espacial via $queryRaw + ST_Contains.
+model SantosNeighborhood {
+  id             String                             @id @default(uuid())
+  name           String                             @unique
+  normalizedName String                             @unique
+  geom           Unsupported("geometry(Polygon, 4326)")
+  createdAt      DateTime                           @default(now())
+  updatedAt      DateTime                           @updatedAt
+
+  users User[]
+
+  @@index([geom], type: Gist, map: "santos_neighborhoods_geom_gist")
+  @@map("santos_neighborhoods")
+}
+
+/// Um usuário avalia cada ocorrência no máximo uma vez.
+model Evaluation {
+  id           String         @id @default(uuid())
+  userId       String
+  occurrenceId String
+  type         EvaluationType
+  createdAt    DateTime       @default(now())
+
+  user       User       @relation(fields: [userId], references: [id])
+  occurrence Occurrence @relation(fields: [occurrenceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, occurrenceId])
+  @@map("evaluations")
+}
+
+/// Auditoria de mudanças de status feitas por gestores.
+model OccurrenceStatusHistory {
+  id             String            @id @default(uuid())
+  occurrenceId   String
+  previousStatus OccurrenceStatus?
+  newStatus      OccurrenceStatus
+  changedById    String
+  createdAt      DateTime          @default(now())
+
+  occurrence Occurrence @relation(fields: [occurrenceId], references: [id], onDelete: Cascade)
+  changedBy  User       @relation(fields: [changedById], references: [id])
+
+  @@index([occurrenceId])
+  @@index([changedById])
+  @@map("occurrence_status_history")
+}

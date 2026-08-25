@@ -1,9 +1,9 @@
 import { StyleSheet, Text, View } from "react-native";
-import type { Occurrence } from "../data/mockOccurrences";
+import type { OccurrenceCardModel } from "../lib/format";
 import { colors } from "../theme";
 
 type OccurrenceSummaryCardProps = {
-  occurrence: Occurrence;
+  occurrence: OccurrenceCardModel;
   compact?: boolean;
 };
 
@@ -15,7 +15,7 @@ export function OccurrenceSummaryCard({
     <View style={[styles.card, compact && styles.compact]}>
       {compact ? null : <Text style={styles.kicker}>Resumo da Ocorrência</Text>}
       <Text style={styles.title} numberOfLines={2}>
-        {occurrence.title} - {occurrence.address}
+        {occurrence.title}
       </Text>
       <Text style={styles.meta}>
         Reportado há {occurrence.reportedAgo} - {occurrence.evaluations} avaliações

@@ -1,7 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -11,12 +14,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FilterChips } from "../../components/FilterChips";
 import { OccurrenceSummaryCard } from "../../components/OccurrenceSummaryCard";
-import {
-  CURRENT_USER,
-  FILTERS,
-  OCCURRENCES,
-  type Occurrence,
-} from "../../data/mockOccurrences";
+import { useCategories, useOccurrences } from "../../hooks/use-feed";
+import { toCardModel } from "../../lib/format";
+import { useAuthStore } from "../../store/auth";
 import { colors, statusColors } from "../../theme";
 
 const COLUMNS = 4;
@@ -24,59 +24,89 @@ const H_PADDING = 16;
 const GAP = 8;
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
+  const user = useAuthStore((state) => state.user);
   const [filter, setFilter] = useState("Todos");
-  const [selectedId, setSelectedId] = useState(OCCURRENCES[0].id);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const tileSize = (width - H_PADDING * 2 - GAP * (COLUMNS - 1)) / COLUMNS;
 
-  const items = useMemo(
-    () =>
-      filter === "Todos"
-        ? OCCURRENCES
-        : OCCURRENCES.filter((item) => item.category === filter),
-    [filter],
+  const occurrencesQuery = useOccurrences();
+  const categoriesQuery = useCategories();
+
+  const filters = useMemo(
+    () => ["Todos", ...(categoriesQuery.data?.map((item) => item.name) ?? [])],
+    [categoriesQuery.data],
   );
 
+  const cards = useMemo(() => {
+    const items = (occurrencesQuery.data ?? []).map(toCardModel);
+    return filter === "Todos" ? items : items.filter((item) => item.category === filter);
+  }, [filter, occurrencesQuery.data]);
+
   const selected =
-    items.find((item) => item.id === selectedId) ?? items[0] ?? OCCURRENCES[0];
+    cards.find((item) => item.id === selectedId) ?? cards[0] ?? null;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.city}>{CURRENT_USER.city}</Text>
-          <Text style={styles.neighborhood}>{CURRENT_USER.neighborhood}</Text>
+          <Text style={styles.city}>Santos</Text>
+          <Text style={styles.neighborhood}>
+            {user?.neighborhood ?? "Seu bairro"}
+          </Text>
         </View>
-        <Pressable style={styles.avatar}>
+        <Pressable style={styles.avatar} onPress={() => router.push("/account")}>
           <Ionicons name="person" size={22} color={colors.primary} />
         </Pressable>
       </View>
 
-      <FilterChips filters={FILTERS} selected={filter} onSelect={setFilter} />
+      <FilterChips filters={filters} selected={filter} onSelect={setFilter} />
 
       <View style={styles.gridWrap}>
-        <FlatList
-          data={items}
-          key={`grid-${tileSize.toFixed(1)}`}
-          keyExtractor={(item) => item.id}
-          numColumns={COLUMNS}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={styles.grid}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <OccurrenceTile
-              occurrence={item}
-              selected={item.id === selected.id}
-              size={tileSize}
-              onPress={() => setSelectedId(item.id)}
-            />
-          )}
-        />
+        {occurrencesQuery.isLoading ? (
+          <ActivityIndicator style={styles.state} color={colors.primary} />
+        ) : occurrencesQuery.isError ? (
+          <View style={styles.state}>
+            <Text style={styles.stateTitle}>Não foi possível carregar o feed</Text>
+            <Pressable onPress={() => void occurrencesQuery.refetch()}>
+              <Text style={styles.retry}>Tentar de novo</Text>
+            </Pressable>
+          </View>
+        ) : cards.length === 0 ? (
+          <View style={styles.state}>
+            <Text style={styles.stateTitle}>Nenhuma ocorrência ainda</Text>
+            <Text style={styles.stateText}>
+              Quando alguém registrar no bairro, ela aparece aqui.
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={cards}
+            key={`grid-${tileSize.toFixed(1)}`}
+            keyExtractor={(item) => item.id}
+            numColumns={COLUMNS}
+            columnWrapperStyle={styles.row}
+            contentContainerStyle={styles.grid}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <OccurrenceTile
+                occurrence={item}
+                selected={item.id === selected?.id}
+                size={tileSize}
+                onPress={() => setSelectedId(item.id)}
+              />
+            )}
+          />
+        )}
 
         {selected ? (
-          <View style={styles.summary}>
+          <Pressable
+            style={styles.summary}
+            onPress={() => router.push(`/occurrence/${selected.id}`)}
+          >
             <OccurrenceSummaryCard occurrence={selected} />
-          </View>
+          </Pressable>
         ) : null}
       </View>
     </SafeAreaView>
@@ -89,7 +119,7 @@ function OccurrenceTile({
   size,
   onPress,
 }: {
-  occurrence: Occurrence;
+  occurrence: ReturnType<typeof toCardModel>;
   selected: boolean;
   size: number;
   onPress: () => void;
@@ -104,9 +134,13 @@ function OccurrenceTile({
         selected && styles.tileSelected,
       ]}
     >
-      <View style={[styles.photo, { backgroundColor: occurrence.photoTone }]}>
-        <Ionicons name="image-outline" size={18} color="#8A8A8A" />
-      </View>
+      {occurrence.thumbnailUrl ? (
+        <Image source={{ uri: occurrence.thumbnailUrl }} style={styles.photo} />
+      ) : (
+        <View style={[styles.photo, styles.photoFallback]}>
+          <Ionicons name="image-outline" size={18} color="#8A8A8A" />
+        </View>
+      )}
       <View
         style={[
           styles.dot,
@@ -170,7 +204,11 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   photo: {
-    flex: 1,
+    width: "100%",
+    height: "100%",
+    backgroundColor: colors.grid,
+  },
+  photoFallback: {
     alignItems: "center",
     justifyContent: "center",
   },
@@ -189,5 +227,29 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     bottom: 10,
+  },
+  state: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+    paddingBottom: 80,
+  },
+  stateTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  stateText: {
+    color: colors.muted,
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 8,
+  },
+  retry: {
+    color: colors.primary,
+    fontWeight: "700",
+    marginTop: 12,
   },
 });

@@ -22,7 +22,8 @@
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test -w @cidade-plus/api"
   },
   "engines": {
     "node": ">=20",

@@ -81,6 +81,10 @@ apps/mobile/ios/*.xcworkspace
 docker-data/
 *.pid
 
+# Uploads locais (fallback sem Cloudinary)
+uploads/
+apps/api/uploads/
+
 # Test / coverage
 coverage/
 .nyc_output/

@@ -13,7 +13,6 @@ export const registerBodySchema = z.object({
     .string()
     .transform(onlyDigits)
     .refine((value) => value.length === 8, "CEP deve ter 8 dígitos"),
-  neighborhood: z.string().trim().min(2).max(80),
 });
 
 export const loginBodySchema = z.object({

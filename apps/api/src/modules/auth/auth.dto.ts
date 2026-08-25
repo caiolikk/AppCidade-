@@ -10,6 +10,7 @@ export function toPrivateUser(user: User) {
     reputationScore: user.reputationScore,
     cep: user.cep,
     neighborhood: user.neighborhood,
+    santosNeighborhoodId: user.santosNeighborhoodId,
     createdAt: user.createdAt,
   };
 }

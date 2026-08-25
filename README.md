@@ -198,8 +198,35 @@
 
 ## Tecnologias
 
-> **Mobile:** React Native + TypeScript  
-> **Back-end:** Node.js + Express  
-> **Banco de dados:** PostgreSQL
-> 
-> As tecnologias e serviços complementares relacionados a mapas, armazenamento de imagens, notificações e Inteligência Artificial serão definidos durante a evolução do projeto.
+> **Mobile:** React Native + Expo SDK 54 + Expo Router + TypeScript  
+> **Back-end:** Node.js + Fastify  
+> **Banco de dados:** PostgreSQL 16 + PostGIS (Prisma)  
+> **Auth:** JWT + bcrypt, papéis CITIZEN / MANAGER / ADMIN  
+> **Mapas:** react-native-maps + geofencing PostGIS (`ST_Contains`)  
+> **Imagens:** Cloudinary no backend (fallback local em desenvolvimento)
+
+A visão de produto acima permanece. Neste corte da fundação: foto obrigatória, 7 status de ocorrência, sem subcategoria e sem IA. Avaliação comunitária (`UTIL` / `PERSISTE` / `INCORRETA`) já tem endpoint e tela.
+
+## Como executar a fundação
+
+Requisitos: Node 20+, npm 10+, Docker Desktop e Expo Go **SDK 54**.
+
+```bash
+cd AppCidade-
+copy .env.example .env
+npm install
+npm run db:up
+npx prisma migrate deploy
+npm run db:seed
+npm run dev:api
+npm run dev:mobile
+```
+
+- API: `http://127.0.0.1:3333/health`
+- App: ler o QR no Expo Go (mesmo Wi-Fi). Se o celular não alcançar a API, libere a porta **3333** no firewall ou defina `EXPO_PUBLIC_API_URL` no `.env`.
+- Contas seed: `admin@cidade.plus` / `admin1234` e `gestor@cidade.plus` / `gestor1234`
+- CEP de Santos para cadastro de cidadão: `11030-000` (ViaCEP devolve Ponta da Praia)
+- Testes: `npm test` (API precisa do Postgres no ar)
+
+Cloudinary é opcional. Sem as chaves `CLOUDINARY_*`, as fotos ficam em `apps/api/uploads` e são servidas em `/media`.
+

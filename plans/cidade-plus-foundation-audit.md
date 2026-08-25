@@ -604,7 +604,7 @@ Validado. Seguiu para a ETAPA 5.
 
 O cliente **não** escolhe a role no cadastro. JWT ~15 min. Senha só como `passwordHash` (bcrypt).
 
-CEP e bairro são gravados com validação de formato. **ViaCEP e polígono ficam na ETAPA 6.**
+O cadastro **não** aceita bairro enviado pelo cliente. CEP é resolvido no backend (ETAPA 6).
 
 ### Seed local
 
@@ -612,29 +612,79 @@ CEP e bairro são gravados com validação de formato. **ViaCEP e polígono fica
 
 - `admin@cidade.plus` / `admin1234`
 - `gestor@cidade.plus` / `gestor1234`
+- bairros de desenvolvimento: Gonzaga e Ponta da Praia (polígonos aproximados)
+- categorias iniciais
 
-### Testes realizados
+### Testes da ETAPA 5 (já feitos)
 
-| Teste | Resultado |
-|---|---|
-| Typecheck da API | OK |
-| Cadastro cidadão | 200 — role `CITIZEN`, sem `passwordHash` |
-| Login | 200 + token |
-| `GET /me` com token | 200 |
-| `GET /me` sem token | 401 |
-| Cidadão em `/manager` e `/admin` | 403 |
-| Gestor em `/manager` | 200; em `/admin` | 403 |
-| Admin em `/admin` | 200 |
-| E-mail/CPF duplicado | 409 |
-| Payload inválido | 400 |
+Cadastro, login, `/me`, 401/403 por role, duplicidade e payload inválido.
 
-### Próximo passo (bloqueado até validação)
+---
 
-**ETAPA 6 — CEP + ViaCEP + bairro**
+## 21. ETAPAS 6–8 e 12 — CEP, geofencing, ocorrências e avaliações
 
-- Consultar ViaCEP no backend
-- Aceitar só Santos/SP
-- Normalizar bairro e associar a `SantosNeighborhood` quando existir
-- Sem geofencing `ST_Contains` ainda (ETAPA 7)
+Implementadas no backend. **Não validadas com o banco nesta sessão** (Docker Desktop estava desligado).
 
-Aguardar validação explícita para avançar.
+### ViaCEP (ETAPA 6)
+
+Fluxo no `POST /auth/register`:
+
+CEP → ViaCEP → UF=SP → cidade=Santos → bairro oficial → `normalizedName` → `santosNeighborhoodId` se o polígono existir.
+
+O frontend **não** informa o bairro usado no cadastro.
+
+### Geofencing (ETAPA 7)
+
+`POST /occurrences/geofence-check` e `POST /occurrences` usam `ST_Contains` + `ST_MakePoint(longitude, latitude)` no bairro **do usuário autenticado**.
+
+Fora do polígono: `403` — `Você só pode registrar ocorrências dentro do seu bairro residencial.`
+
+### Ocorrências e fotos (ETAPA 8)
+
+- Foto obrigatória (`media` com pelo menos 1 item)
+- Thumbnail no DTO público; `url` original só no DTO admin
+- Cloudinary preparado (`CLOUDINARY_*`); upload real fica para quando as credenciais existirem
+
+### Avaliações (ETAPA 12)
+
+`POST /occurrences/:id/evaluations` — um voto por usuário (`409` na segunda tentativa).
+
+### Rotas novas
+
+| Método | Rota | Acesso |
+|---|---|---|
+| `GET` | `/categories` | público |
+| `GET` | `/occurrences` | público (sem CPF, e-mail, senha, imagem original) |
+| `GET` | `/occurrences/:id` | público |
+| `POST` | `/occurrences/geofence-check` | autenticado |
+| `POST` | `/occurrences` | autenticado + geofence + foto |
+| `POST` | `/occurrences/:id/evaluations` | autenticado |
+| `GET` | `/admin/occurrences/:id` | MANAGER/ADMIN |
+| `PATCH` | `/admin/occurrences/:id/status` | MANAGER/ADMIN |
+
+### Como validar quando o Docker estiver aberto
+
+```text
+npm run db:up
+npx prisma migrate deploy
+npm run db:seed
+npm run dev:api
+```
+
+Testes sugeridos:
+
+- CEP Santos (ex.: `11030000`)
+- CEP de outra cidade / outro estado / inexistente / malformado
+- ponto dentro de Gonzaga ≈ `-23.967, -46.335` (lat, lng)
+- ponto fora do bairro
+- ocorrência sem foto
+- segundo voto na mesma ocorrência
+
+### Ainda pendente no plano
+
+- ETAPA 9/10: ligar o Expo (login, cadastro, token no SecureStore) à API
+- ETAPA 11: mapa real (`react-native-maps`) no lugar do placeholder
+- ETAPA 13: suíte de testes automatizados + documentação no README
+- Upload Cloudinary de fato (precisa das chaves)
+
+Aguardar Docker ligado para validar CEP/geofencing ao vivo, depois a integração mobile.

@@ -27,7 +27,21 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Cidade+ precisa da galeria para anexar a evidência da ocorrência.",
+          "cameraPermission": "O Cidade+ precisa da câmera para fotografar a evidência da ocorrência."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O Cidade+ usa sua localização para registrar a ocorrência no seu bairro."
+        }
+      ]
     ]
   }
 }

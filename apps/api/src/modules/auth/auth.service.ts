@@ -1,3 +1,4 @@
+import { resolveResidentialAddress } from "../cep/resolve-address.js";
 import { prisma } from "../../lib/prisma.js";
 import { HttpError } from "../../utils/http-error.js";
 import { signAccessToken } from "../../utils/jwt.js";
@@ -16,13 +17,16 @@ export async function registerCitizen(input: RegisterBody) {
     throw new HttpError(409, "E-mail ou CPF já cadastrado.");
   }
 
+  const address = await resolveResidentialAddress(input.cep);
+
   const user = await prisma.user.create({
     data: {
       name: input.name,
       email: input.email,
       cpf: input.cpf,
-      cep: input.cep,
-      neighborhood: input.neighborhood,
+      cep: address.cep,
+      neighborhood: address.neighborhoodName,
+      santosNeighborhoodId: address.santosNeighborhoodId,
       passwordHash: await hashPassword(input.password),
       role: "CITIZEN",
     },

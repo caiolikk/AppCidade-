@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Cidade+ — Plano de Marketing Digital</title>
+  <style>
+    @page { size: A4; margin: 18mm 17mm 18mm 17mm; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      color: #1A1F26;
+      font-family: "Segoe UI", "Calibri", "Helvetica Neue", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.48;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .cover {
+      page-break-after: always;
+      min-height: 261mm;
+      background: #153A6B;
+      color: #F7F4EC;
+      padding: 22mm 18mm 16mm;
+      margin: -18mm -17mm 0;
+    }
+    .cover .tag {
+      display: inline-block;
+      background: #E8C56B;
+      color: #153A6B;
+      font-weight: 700;
+      font-size: 9pt;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      border-radius: 999px;
+    }
+    .cover .plus {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      background: #E8C56B;
+      color: #153A6B;
+      font-size: 28pt;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 28px 0 18px;
+    }
+    .cover h1 { font-size: 42pt; margin: 0 0 8px; letter-spacing: -0.03em; }
+    .cover h2 { font-size: 16pt; font-weight: 600; margin: 0 0 22px; color: #E8EDF4; }
+    .cover .rule { width: 64px; height: 5px; background: #E8C56B; border-radius: 99px; margin-bottom: 22px; }
+    .cover p.lead { font-size: 13pt; max-width: 150mm; color: #D5DEEA; }
+    .cover .meta {
+      margin-top: 48px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px 24px;
+      font-size: 10.5pt;
+      color: #C7D3E3;
+    }
+    .cover .meta strong { display: block; color: #fff; font-size: 11pt; margin-bottom: 3px; }
+
+    h1.sec {
+      color: #153A6B;
+      font-size: 18pt;
+      margin: 0 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 3px solid #1F6B4A;
+      page-break-after: avoid;
+    }
+    h2 {
+      color: #153A6B;
+      font-size: 13.5pt;
+      margin: 18px 0 8px;
+      page-break-after: avoid;
+    }
+    h3 {
+      color: #1F6B4A;
+      font-size: 11.5pt;
+      margin: 14px 0 6px;
+      page-break-after: avoid;
+    }
+    p { margin: 0 0 9px; text-align: justify; }
+    ul, ol { margin: 0 0 10px; padding-left: 18px; }
+    li { margin-bottom: 4px; }
+
+    .toc { page-break-after: always; }
+    .toc ol { list-style: none; padding: 0; }
+    .toc > ol > li { margin: 10px 0 4px; font-weight: 700; color: #153A6B; }
+    .toc ol ol { margin: 4px 0 8px 16px; }
+    .toc ol ol li { font-weight: 400; color: #1A1F26; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 14px;
+      font-size: 10pt;
+      page-break-inside: avoid;
+    }
+    th {
+      background: #153A6B;
+      color: #fff;
+      text-align: left;
+      padding: 7px 8px;
+      font-weight: 650;
+    }
+    td { border: 1px solid #D6D3C8; padding: 7px 8px; vertical-align: top; }
+    tr:nth-child(even) td { background: #F7F4EC; }
+
+    .swot { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 14px; page-break-inside: avoid; }
+    .swot .box { border-radius: 8px; padding: 10px 12px; min-height: 92px; }
+    .swot h3 { margin: 0 0 6px; color: inherit; }
+    .swot ul { margin: 0; padding-left: 16px; }
+    .s { background: #E6F4EC; color: #14532D; }
+    .w { background: #FEF3C7; color: #78350F; }
+    .o { background: #DBEAFE; color: #1E3A8A; }
+    .t { background: #FEE2E2; color: #7F1D1D; }
+
+    .cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 8px 0 12px; page-break-inside: avoid; }
+    .card {
+      border: 1px solid #E4E0D4;
+      border-radius: 8px;
+      padding: 10px 11px;
+      background: #F7F4EC;
+    }
+    .card strong { display: block; color: #153A6B; margin-bottom: 4px; }
+
+    .journey { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 8px 0 12px; page-break-inside: avoid; }
+    .j {
+      background: #153A6B;
+      color: #F7F4EC;
+      border-radius: 8px;
+      padding: 8px 8px 10px;
+      font-size: 9pt;
+    }
+    .j b { display: block; font-size: 10pt; margin-bottom: 4px; color: #E8C56B; }
+
+    .note {
+      background: #F7F4EC;
+      border-left: 4px solid #1F6B4A;
+      padding: 8px 12px;
+      margin: 8px 0 12px;
+      font-size: 10.5pt;
+    }
+
+    .footer-note { font-size: 9pt; color: #5B6573; margin-top: 16px; }
+    .keep { page-break-inside: avoid; }
+  </style>
+</head>
+<body>
+
+  <section class="cover">
+    <span class="tag">Plano de marketing digital</span>
+    <div class="plus">+</div>
+    <h1>Cidade+</h1>
+    <h2>O cidadão reporta. A cidade enxerga o problema.</h2>
+    <div class="rule"></div>
+    <p class="lead">
+      Plano de marketing para o lançamento e o posicionamento digital de um aplicativo de reporte urbano em Santos/SP.
+    </p>
+    <div class="meta">
+      <div>
+        <strong>Empreendedores</strong>
+        Ana Carolina dos Santos Sabino<br />
+        Carlos Eduardo da Silva Santos<br />
+        Caio Henrique Cid Rodrigues Cunha
+      </div>
+      <div>
+        <strong>Mercado</strong>
+        Civic tech · Participação cidadã<br />
+        Santos / SP · Android e iOS
+      </div>
+      <div>
+        <strong>Documento</strong>
+        Seções 1 a 3 do Plano de Marketing
+      </div>
+      <div>
+        <strong>Previsão de entrega do produto</strong>
+        26 de novembro de 2026
+      </div>
+    </div>
+  </section>
+
+  <section class="toc">
+    <h1 class="sec">Sumário</h1>
+    <ol>
+      <li>1. Introdução
+        <ol>
+          <li>1.1 Contextualização do negócio</li>
+          <li>1.2 Apresentação da empresa, do produto/serviço</li>
+          <li>1.3 Apresentação dos empreendedores</li>
+          <li>1.4 Justificativa do Plano de Marketing Digital</li>
+          <li>1.5 Objetivos do plano</li>
+        </ol>
+      </li>
+      <li>2. Análise de ambiente
+        <ol>
+          <li>2.1 Análise do ambiente interno</li>
+          <li>2.2 Análise do ambiente externo</li>
+          <li>2.3 Análise do mercado digital</li>
+          <li>2.4 Análise dos concorrentes</li>
+          <li>2.5 Análise SWOT</li>
+        </ol>
+      </li>
+      <li>3. Definição do público-alvo
+        <ol>
+          <li>3.1 Caracterização do público-alvo</li>
+          <li>3.2 Perfil e comportamento do consumidor digital</li>
+          <li>3.3 Definição dos usuários</li>
+          <li>3.4 Jornada de compra do consumidor</li>
+        </ol>
+      </li>
+    </ol>
+    <div class="note">
+      Este documento cobre as seções 1 a 3 pedidas na tarefa. O Cidade+ é um serviço digital gratuito para o cidadão; a “compra” aqui é a adoção do app — baixar, cadastrar-se e registrar a primeira ocorrência.
+    </div>
+  </section>
+
+  <h1 class="sec">1. Introdução</h1>
+
+  <h2>1.1 Contextualização do negócio</h2>
+  <p>
+    Santos é o principal município da Baixada Santista, com cerca de 429,5 mil habitantes (estimativa IBGE 2025) e área de influência que passa de 1,8 milhão de pessoas na região. É cidade portuária, turística e de alta densidade: o cotidiano mistura morador, trabalhador do porto, estudante e visitante. Buraco, calçada quebrada, lâmpada apagada e lixo irregular não são exceção — fazem parte da paisagem e da conversa de bairro.
+  </p>
+  <p>
+    O problema de negócio não é a falta absoluta de canal. A Prefeitura já oferece Ouvidoria (telefone 162 e formulário no portal), páginas de serviços e iniciativas digitais. O que falta é um jeito rápido, visual e local de reportar e acompanhar: foto, ponto no mapa e retorno sobre o que aconteceu depois. Hoje o relato foge para WhatsApp, grupos de moradores e redes sociais — onde a informação se perde, não vira dado e quase nunca volta para quem denunciou.
+  </p>
+  <p>
+    O Cidade+ nasce nesse intervalo: um aplicativo mobile que transforma o “olha esse buraco” em ocorrência georreferenciada, pública no mapa (sem expor a pessoa) e organizada por bairro. O negócio é de civic tech: valor para o cidadão (voz e transparência) e, no futuro, valor para a gestão pública (demanda visível, priorizável e rastreável).
+  </p>
+
+  <h2>1.2 Apresentação da empresa, do produto/serviço</h2>
+  <p>
+    O Cidade+ é uma startup de tecnologia cívica com recorte inicial em Santos/SP. Não vende um produto de prateleira para o morador: oferece um serviço digital gratuito de participação. O modelo de negócio, na maturidade, aponta para B2G (parceria ou licenciamento com a administração pública) e, enquanto isso, opera como plataforma cidadã independente — o mapa e a comunidade já geram valor mesmo sem contrato oficial.
+  </p>
+  <p>
+    O produto é um aplicativo para Android e iOS. O cidadão cria conta com CEP de Santos, o sistema identifica o bairro, e o usuário passa a ver ocorrências no feed e no mapa. Para abrir um relato: foto obrigatória e GPS. A regra central é territorial: só se registra dentro do próprio bairro, validado no servidor. No mapa público aparece o problema, não quem reportou. Vizinhos podem votar se o relato é útil, se o problema continua ou se a informação está errada.
+  </p>
+  <div class="cards">
+    <div class="card">
+      <strong>Para o cidadão</strong>
+      Reportar em minutos, ver o bairro no mapa e acompanhar o status sem ligar para a Ouvidoria.
+    </div>
+    <div class="card">
+      <strong>Para a comunidade</strong>
+      Um mural coletivo do que está quebrado na rua — com validação de quem mora ali.
+    </div>
+    <div class="card">
+      <strong>Para a gestão</strong>
+      Demanda com foto, coordenada e bairro, pronta para triagem quando o painel administrativo estiver no ar.
+    </div>
+  </div>
+  <p>
+    A promessa de marca é direta: <em>o cidadão já consegue reportar com foto, no próprio bairro — e a cidade vê o problema, não a pessoa.</em> Privacidade (LGPD), mapa como centro da experiência e recorte santista são os pilares de posicionamento.
+  </p>
+
+  <h2>1.3 Apresentação dos empreendedores</h2>
+  <p>
+    O Cidade+ é conduzido por três sócios-fundadores, responsáveis pela visão de produto, pela construção da plataforma e pelo plano de entrada no mercado local.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Empreendedor</th>
+        <th>Papel no negócio</th>
+        <th>Foco</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Ana Carolina dos Santos Sabino</strong></td>
+        <td>Co-fundadora · Produto e comunicação</td>
+        <td>Voz da marca, clareza da proposta para o cidadão e relacionamento com o público de Santos.</td>
+      </tr>
+      <tr>
+        <td><strong>Carlos Eduardo da Silva Santos</strong></td>
+        <td>Co-fundador · Tecnologia</td>
+        <td>Arquitetura do app e da API, qualidade da entrega e viabilidade técnica do mapa e do geofence.</td>
+      </tr>
+      <tr>
+        <td><strong>Caio Henrique Cid Rodrigues Cunha</strong></td>
+        <td>Co-fundador · Operação e mercado</td>
+        <td>Priorização do MVP, leitura de concorrentes e desenho da entrada digital no município.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    A equipe é enxuta de propósito: três pessoas cobrem produto, engenharia e go-to-market. Isso limita escala de mídia paga no curto prazo e, ao mesmo tempo, obriga o plano digital a ser local, orgânico e fácil de explicar — o que combina com um app de bairro.
+  </p>
+
+  <h2>1.4 Justificativa do Plano de Marketing Digital</h2>
+  <p>
+    O Cidade+ só existe se o morador souber que o canal existe e confiar o bastante para abrir o celular na rua. O público-alvo já vive no digital: WhatsApp, Instagram, Google Maps e a loja de aplicativos. Não faz sentido lançar um app cívico só com cartaz na prefeitura. O plano digital é o caminho natural de descoberta, educação e ativação.
+  </p>
+  <p>
+    Há uma segunda razão. Os canais oficiais (162, portal, atendimento presencial) são pouco “compartilháveis”. Um relato no Cidade+ vira ponto no mapa e pode ser mostrado ao vizinho. Marketing digital aqui não é só divulgação: é o próprio produto circulando em rede. Sem plano, o app compete em silêncio com o grupo do condomínio — e perde.
+  </p>
+  <p>
+    Por fim, o negócio ainda não tem contrato com a Prefeitura. A legitimidade inicial virá da base de cidadãos, da qualidade dos relatos e da reputação pública. Marketing digital é o instrumento para construir essa base em Santos antes de conversar com a gestão.
+  </p>
+
+  <h2>1.5 Objetivos do plano</h2>
+  <p>Objetivo geral: posicionar o Cidade+ como o canal digital mais simples para reportar problema de rua em Santos e converter curiosos em usuários que registram a primeira ocorrência.</p>
+  <table>
+    <thead>
+      <tr><th>Tipo</th><th>Objetivo</th><th>Indicador</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Conhecimento</td>
+        <td>Fazer o morador de Santos associar “buraco / lâmpada / lixo” ao Cidade+.</td>
+        <td>Alcance local em Instagram/Reels e buscas pelo nome da marca.</td>
+      </tr>
+      <tr>
+        <td>Consideração</td>
+        <td>Explicar, em 15 segundos, por que o app é melhor que o 162 ou o grupo de WhatsApp.</td>
+        <td>Visualizações do vídeo de onboarding e taxa de visita à página/loja.</td>
+      </tr>
+      <tr>
+        <td>Conversão</td>
+        <td>Gerar cadastros com CEP de Santos e a primeira ocorrência com foto.</td>
+        <td>Contas criadas e ocorrências válidas por bairro.</td>
+      </tr>
+      <tr>
+        <td>Retenção</td>
+        <td>Fazer o usuário voltar para votar, acompanhar status e indicar o vizinho.</td>
+        <td>Usuários ativos no mês e votos comunitários.</td>
+      </tr>
+      <tr>
+        <td>Reputação</td>
+        <td>Fixar a marca como transparente e cuidadosa com dados pessoais.</td>
+        <td>Menções positivas e ausência de crise de privacidade.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h1 class="sec">2. Análise de ambiente</h1>
+
+  <h2>2.1 Análise do ambiente interno</h2>
+  <p>
+    Por dentro, o Cidade+ já tem fundação de produto: cadastro e login, restrição a CEP de Santos, ocorrência com foto e GPS, geofence de bairro, feed, mapa, voto da comunidade, API e testes. O app abre no celular via Expo. Isso é ativo real — não é apenas ideia de pitch.
+  </p>
+  <p>
+    Os recursos são os de uma equipe de três: velocidade para iterar, custo baixo e domínio da stack (Expo/React Native, Fastify, PostgreSQL/PostGIS, Prisma, JWT). A marca é clara e local. A privacidade está no desenho (mapa sem autor). A cultura é de MVP honesto: o que não está pronto não é vendido como pronto.
+  </p>
+  <p>
+    As limitações internas também são explícitas. Ainda não há painel web para o gestor mudar status; os polígonos oficiais da cidade não estão carregados (há bairros de teste); o envio de foto em nuvem de produção e as notificações ainda são incompletos. Não existe verba robusta de mídia, nem contrato institucional que dê “selo de prefeitura”. A força interna é produto e recorte; a fraqueza é escala comercial e cobertura territorial oficial.
+  </p>
+
+  <h2>2.2 Análise do ambiente externo</h2>
+  <div class="keep">
+    <table>
+      <thead>
+        <tr><th>Dimensão</th><th>Fato relevante</th><th>Implicação para o Cidade+</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Político / institucional</td>
+          <td>Prefeituras digitais, ouvidoria e carta de serviços já fazem parte do discurso público. Santos tem portal, 162 e iniciativas como Santos Digital.</td>
+          <td>Há espaço para complementar o canal oficial — e risco de o município lançar ou adotar um app próprio.</td>
+        </tr>
+        <tr>
+          <td>Econômico</td>
+          <td>Cidade de renda formal relativamente alta no litoral, porto e turismo. Smartphone é hábito, não luxo para boa parte do público urbano.</td>
+          <td>O cidadão não paga pelo app; o valor econômico está na eficiência da gestão e na pressão comunitária.</td>
+        </tr>
+        <tr>
+          <td>Social</td>
+          <td>Cultura de bairro forte (Gonzaga, Ponta da Praia, Centro, Morro). Relato ainda é conversa de rua e de grupo.</td>
+          <td>Mensagem deve ser de vizinho, não de “sistema da prefeitura”.</td>
+        </tr>
+        <tr>
+          <td>Tecnológico</td>
+          <td>Android predominante; iOS relevante na orla. Mapas e câmera são usos diários.</td>
+          <td>Foto + GPS é o comportamento nativo. O app precisa ser leve e simples.</td>
+        </tr>
+        <tr>
+          <td>Legal</td>
+          <td>LGPD, dados de localização e imagem de via pública exigem cuidado.</td>
+          <td>Minimizar dados no mapa é argumento de marketing e de conformidade.</td>
+        </tr>
+        <tr>
+          <td>Ambiental / urbano</td>
+          <td>Orla, morros, porto e alta densidade geram demanda contínua de zeladoria.</td>
+          <td>Sempre haverá “estoque” de problemas para reportar — o mercado não some.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>2.3 Análise do mercado digital</h2>
+  <p>
+    O mercado em que o Cidade+ compete não é “loja de app” no abstrato. É o mercado da atenção cívica no celular. O morador já resolve (ou tenta resolver) a rua pelo WhatsApp do vereador, pelo Instagram da prefeitura, pelo 162 e pelo Google. Qualquer novo app entra nessa fila de hábitos.
+  </p>
+  <p>
+    Três movimentos digitais importam. Primeiro, o Brasil é mobile-first: o relato precisa nascer na câmera, não num formulário de desktop. Segundo, o conteúdo curto (Reels, Stories, print do mapa) é o formato que prova o produto — um pin no Gonzaga vale mais que um parágrafo institucional. Terceiro, civic tech no Brasil já tem players nacionais (como o Colab) e apps independentes de mapa (CiLi, BetterCity). O mercado existe; o que ainda é rarefeito é uma marca com cara de Santos, regra de bairro e privacidade explícita.
+  </p>
+  <p>
+    Canais digitais prioritários para este plano: Instagram (prova social e bairro), WhatsApp (indicação e grupos de moradores), Google Play / App Store (conversão) e, mais tarde, parcerias com páginas de bairro e perfis de jornalismo local. Mídia paga, se houver, deve ser hiperlocal — não estadual.
+  </p>
+
+  <h2>2.4 Análise dos concorrentes</h2>
+  <p>
+    O Cidade+ não concorre só com outro app de civic tech. Concorre com o caminho que o morador já usa quando vê um problema.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Concorrente</th>
+        <th>O que oferece</th>
+        <th>Ponto fraco para o nosso recorte</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Ouvidoria 162 / portal Santos</strong></td>
+        <td>Canal oficial, protocolo, encaminhamento institucional.</td>
+        <td>Pouca cara de mapa, pouca comunidade, percepção de burocracia.</td>
+      </tr>
+      <tr>
+        <td><strong>Santos Digital e serviços do portal</strong></td>
+        <td>Carta de serviços e presença institucional no celular/web.</td>
+        <td>Não é um feed colaborativo de problemas da rua.</td>
+      </tr>
+      <tr>
+        <td><strong>WhatsApp, grupos e Instagram</strong></td>
+        <td>Zero fricção, já está no bolso, viraliza no bairro.</td>
+        <td>Sem histórico público, sem dado, sem status, some na conversa.</td>
+      </tr>
+      <tr>
+        <td><strong>Colab</strong></td>
+        <td>Referência nacional de reporte e participação com prefeituras.</td>
+        <td>Depende de adesão do município; não é “o app de Santos” por padrão.</td>
+      </tr>
+      <tr>
+        <td><strong>Waze / Google Maps</strong></td>
+        <td>Hábito diário de mapa e alerta (trânsito, não zeladoria completa).</td>
+        <td>Não cobre calçada, lixo, iluminação nem ciclo com a gestão local.</td>
+      </tr>
+      <tr>
+        <td><strong>SeeClickFix / Snap Send Solve</strong></td>
+        <td>Referências internacionais de foto + local + prefeitura.</td>
+        <td>Não operam o recorte santista nem a língua e a regra de bairro.</td>
+      </tr>
+      <tr>
+        <td><strong>CiLi / BetterCity</strong></td>
+        <td>Mapa cidadão independente, foto e pressão comunitária.</td>
+        <td>Genéricos para o Brasil; sem geofence de bairro nem marca local.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Posicionamento competitivo: <strong>o app do morador de Santos</strong> — foto obrigatória, só no próprio bairro, mapa sem expor a pessoa, comunidade que valida. Não prometemos substituir a Ouvidoria no dia um. Prometemos ser o jeito mais rápido de tornar o problema visível.
+  </p>
+
+  <h2>2.5 Análise SWOT</h2>
+  <div class="swot">
+    <div class="box s">
+      <h3>Forças</h3>
+      <ul>
+        <li>Recorte claro: Santos, bairro, foto, mapa.</li>
+        <li>Regra de geofence no servidor.</li>
+        <li>Privacidade no desenho (LGPD).</li>
+        <li>Produto já funciona no celular (fundação).</li>
+        <li>Equipe pequena e alinhada.</li>
+      </ul>
+    </div>
+    <div class="box w">
+      <h3>Fraquezas</h3>
+      <ul>
+        <li>Sem contrato com a Prefeitura.</li>
+        <li>Painel do gestor e polígonos oficiais ainda faltam.</li>
+        <li>Marca nova, sem base instalada.</li>
+        <li>Orçamento de mídia praticamente zero.</li>
+        <li>Cobertura de bairros ainda incompleta.</li>
+      </ul>
+    </div>
+    <div class="box o">
+      <h3>Oportunidades</h3>
+      <ul>
+        <li>Hábito de reportar por foto e WhatsApp.</li>
+        <li>Agenda de cidade digital e transparência.</li>
+        <li>Conteúdo local (orla, bairro, turismo).</li>
+        <li>Vazio de um app “santista” de zeladoria.</li>
+        <li>Expansão futura para a Baixada.</li>
+      </ul>
+    </div>
+    <div class="box t">
+      <h3>Ameaças</h3>
+      <ul>
+        <li>Canal oficial ou Colab virar padrão na cidade.</li>
+        <li>Desconfiança (“não vai dar em nada”).</li>
+        <li>Inércia do WhatsApp como “já resolve”.</li>
+        <li>Risco reputacional com foto e dados.</li>
+        <li>Rede ruim em demo/lançamento (campus, 4G).</li>
+      </ul>
+    </div>
+  </div>
+  <p>
+    Leitura da matriz: atacar o mercado com a força do recorte local e da simplicidade, usando conteúdo de bairro (oportunidade), enquanto se fecha a fraqueza do painel e dos polígonos oficiais — sem fingir que já somos o canal da Prefeitura (ameaça institucional).
+  </p>
+
+  <h1 class="sec">3. Definição do público-alvo</h1>
+
+  <h2>3.1 Caracterização do público-alvo</h2>
+  <p>
+    Público primário: cidadãos que moram em Santos, têm smartphone e circulam a pé ou de carro pelo próprio bairro. Recorte inicial de comunicação: adultos de 18 a 45 anos na orla e em bairros de teste, com uso diário de WhatsApp e redes. Não é exclusivo — o app deve ser simples o bastante para um morador de 55 anos registrar um buraco —, mas o motor de divulgação é a faixa mais digital.
+  </p>
+  <p>
+    Público secundário: gestores e servidores que, no futuro, usarão o painel para mudar status (papel MANAGER/ADMIN). Público indireto: imprensa local, associações de bairro, síndicos e páginas de moradores, que amplificam o mapa.
+  </p>
+  <p>
+    Fora do alvo, neste momento: turista ocasional sem CEP santista (o cadastro pede CEP da cidade), e qualquer uso fora do município. Essa exclusão é proposital — fortalece a marca local.
+  </p>
+
+  <h2>3.2 Perfil e comportamento do consumidor digital</h2>
+  <p>
+    O consumidor digital do Cidade+ não “compra” um app de cidade no sábado à noite. Ele encontra um problema no caminho e quer gastar menos de um minuto. O comportamento típico:
+  </p>
+  <ul>
+    <li>Já tira foto de tudo — o gargalo não é a câmera, é saber para quem mandar.</li>
+    <li>Prefere WhatsApp a formulário longo; desiste se pedir CPF na primeira tela pública.</li>
+    <li>Confia mais em prova visual (mapa, print, vizinho) do que em discurso institucional.</li>
+    <li>Consome Instagram e Reels de bairro; segue páginas de Santos, trânsito e “minha rua”.</li>
+    <li>Desconfia de app que parece denúncia anônima sem regra — por isso foto obrigatória e bairro ajudam a vender seriedade.</li>
+    <li>Volta se vir que o relato não morreu: status, voto de outros, pin ainda no mapa.</li>
+  </ul>
+  <p>
+    No funil digital, a decisão é emocional e local (“isso é a minha calçada”) e a fricção é cognitiva (“vai adiantar?”). A comunicação precisa mostrar um caso real do bairro, não um organograma da gestão pública.
+  </p>
+
+  <h2>3.3 Definição dos usuários</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Usuário</th>
+        <th>Quem é</th>
+        <th>O que quer</th>
+        <th>Papel no sistema</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Cidadão relator</strong></td>
+        <td>Morador com CEP de Santos. Ex.: jovem adulto na orla, ou trabalhador que anda o mesmo quarteirão todo dia.</td>
+        <td>Registrar rápido, com foto, e não ser exposto no mapa.</td>
+        <td>CITIZEN — cria ocorrência no próprio bairro.</td>
+      </tr>
+      <tr>
+        <td><strong>Cidadão vizinho</strong></td>
+        <td>Quem abre o mapa sem necessariamente criar o primeiro relato.</td>
+        <td>Saber o que está acontecendo na rua e validar se o problema é real.</td>
+        <td>CITIZEN — vê feed/mapa e vota (útil / persiste / incorreta).</td>
+      </tr>
+      <tr>
+        <td><strong>Gestor</strong></td>
+        <td>Servidor ou equipe de zeladoria (uso futuro do painel).</td>
+        <td>Triar, mudar status e enxergar volume por bairro.</td>
+        <td>MANAGER — atendimento da ocorrência.</td>
+      </tr>
+      <tr>
+        <td><strong>Administrador</strong></td>
+        <td>Equipe Cidade+ ou gestor-mestre da plataforma.</td>
+        <td>Manter categorias, bairros e regras no ar.</td>
+        <td>ADMIN — configuração e moderação.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    O marketing digital fala, neste momento, com o cidadão relator e o vizinho. Gestor e admin entram na conversa institucional depois — quando o painel existir e houver o que mostrar em volume.
+  </p>
+
+  <h2>3.4 Jornada de compra do consumidor</h2>
+  <p>
+    Como o serviço é gratuito, a jornada de compra é a jornada de adoção: do primeiro contato com a marca até o hábito de reportar e indicar. Cinco etapas:
+  </p>
+  <div class="journey">
+    <div class="j"><b>1. Descoberta</b>Vê um Reels do buraco no Gonzaga, um print no grupo do prédio ou o QR numa feira de projetos.</div>
+    <div class="j"><b>2. Consideração</b>Compara com “é só mandar no 162” ou “já postei no grupo”. Quer entender se o app é sério e se os dados ficam expostos.</div>
+    <div class="j"><b>3. Conversão</b>Baixa, cadastra com CEP de Santos, descobre o bairro e entra no mapa.</div>
+    <div class="j"><b>4. Primeiro uso</b>Tira a foto, confirma o GPS dentro do bairro e publica. Se a geofence barrar, ou abandona ou aprende a regra.</div>
+    <div class="j"><b>5. Recompra / indicação</b>Volta para ver o pin, vota em outro relato e manda o app para o vizinho. Essa é a “recompra”.</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Etapa</th>
+        <th>Ponto de contato digital</th>
+        <th>O que o plano precisa garantir</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Descoberta</td>
+        <td>Instagram, WhatsApp, boca a boca, evento acadêmico/local</td>
+        <td>Uma imagem: foto + pin + nome Cidade+.</td>
+      </tr>
+      <tr>
+        <td>Consideração</td>
+        <td>Bio, Reels de 15s, FAQ de privacidade</td>
+        <td>Resposta à objeção “vai adiantar?” e “quem vê meus dados?”.</td>
+      </tr>
+      <tr>
+        <td>Conversão</td>
+        <td>Loja de aplicativos e onboarding de CEP</td>
+        <td>Cadastro curto. CEP de Santos como prova de pertencimento, não como burocracia.</td>
+      </tr>
+      <tr>
+        <td>Primeiro uso</td>
+        <td>Tela de criar ocorrência (foto + GPS)</td>
+        <td>Sucesso em menos de um minuto. Erro de bairro explicado em português claro.</td>
+      </tr>
+      <tr>
+        <td>Recompra</td>
+        <td>Feed, mapa, voto, status</td>
+        <td>O relato continua visível. O vizinho aparece. A marca pede indicação, não anúncio genérico.</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="note">
+    Momento da verdade: a primeira ocorrência aceita. Se o usuário conseguir publicar com foto no próprio bairro e ver o pin no mapa, a “compra” aconteceu. Tudo que o marketing digital fizer depois é para repetir esse gesto e espalhar no quarteirão.
+  </div>
+
+  <p class="footer-note">
+    Cidade+ · Plano de Marketing Digital · Seções 1 a 3 · Santos/SP · Ana Carolina dos Santos Sabino, Carlos Eduardo da Silva Santos e Caio Henrique Cid Rodrigues Cunha.
+  </p>
+
+</body>
+</html>

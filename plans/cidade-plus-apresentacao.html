@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Cidade+ — apresentação</title>
+  <style>
+    @page {
+      size: 13.333in 7.5in;
+      margin: 0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: #0d2444;
+      color: #111111;
+      font-family: "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .slide {
+      width: 13.333in;
+      height: 7.5in;
+      page-break-after: always;
+      break-after: page;
+      position: relative;
+      overflow: hidden;
+      padding: 0.62in 0.72in 0.55in;
+    }
+
+    .slide:last-child { page-break-after: auto; break-after: auto; }
+
+    .bg-navy { background: #153A6B; color: #F7F4EC; }
+    .bg-cream { background: #F6F3EA; }
+    .bg-white { background: #FFFFFF; }
+    .bg-green { background: #1F6B4A; color: #F7F4EC; }
+
+    .eyebrow {
+      font-size: 15px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #1F6B4A;
+      margin-bottom: 12px;
+    }
+
+    .bg-navy .eyebrow,
+    .bg-green .eyebrow { color: #C9E6D6; }
+
+    h1 {
+      font-size: 58px;
+      line-height: 1.08;
+      font-weight: 750;
+      letter-spacing: -0.03em;
+    }
+
+    h2 {
+      font-size: 40px;
+      line-height: 1.15;
+      font-weight: 750;
+      letter-spacing: -0.025em;
+      color: #153A6B;
+    }
+
+    .bg-navy h2,
+    .bg-green h2 { color: #F7F4EC; }
+
+    p, li { font-size: 22px; line-height: 1.4; }
+
+    .muted { color: #5B6573; }
+    .bg-navy .muted { color: #C7D3E3; }
+
+    .bar {
+      width: 72px;
+      height: 6px;
+      background: #1F6B4A;
+      border-radius: 99px;
+      margin: 18px 0 22px;
+    }
+
+    .bar.gold { background: #E8C56B; }
+
+    .footer {
+      position: absolute;
+      left: 0.72in;
+      right: 0.72in;
+      bottom: 0.32in;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      color: #6B7280;
+    }
+
+    .bg-navy .footer,
+    .bg-green .footer { color: #A8B9CC; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px;
+      margin-top: 28px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+      margin-top: 28px;
+    }
+
+    .grid-5 {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+      margin-top: 26px;
+    }
+
+    .card {
+      background: #FFFFFF;
+      border: 1px solid #E4E0D4;
+      border-radius: 18px;
+      padding: 22px 22px 20px;
+      box-shadow: 0 8px 24px rgba(21, 58, 107, 0.05);
+    }
+
+    .card h3 {
+      font-size: 20px;
+      color: #153A6B;
+      margin-bottom: 8px;
+    }
+
+    .card p, .card li {
+      font-size: 17px;
+      line-height: 1.35;
+      color: #374151;
+    }
+
+    .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      background: #153A6B;
+      color: #fff;
+      font-weight: 700;
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+
+    .num.green { background: #1F6B4A; }
+    .num.gold { background: #C9A227; color: #111; }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-top: 32px;
+    }
+
+    .step {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px 16px;
+      border: 1px solid #E4E0D4;
+      min-height: 168px;
+    }
+
+    .step strong {
+      display: block;
+      color: #153A6B;
+      font-size: 20px;
+      margin: 8px 0 6px;
+    }
+
+    .step p { font-size: 16px; color: #4B5563; }
+
+    .plus {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      background: #E8C56B;
+      color: #153A6B;
+      font-size: 44px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .cover-meta {
+      position: absolute;
+      left: 0.72in;
+      right: 0.72in;
+      bottom: 0.48in;
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      font-size: 15px;
+      color: #C7D3E3;
+    }
+
+    .cover-meta strong { color: #F7F4EC; display: block; font-size: 16px; margin-bottom: 4px; }
+
+    ul.clean { list-style: none; margin-top: 18px; }
+    ul.clean li {
+      padding: 12px 0 12px 28px;
+      position: relative;
+      border-bottom: 1px solid #E8E4D8;
+      font-size: 22px;
+    }
+    ul.clean li:last-child { border-bottom: 0; }
+    ul.clean li::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 99px;
+      background: #1F6B4A;
+      position: absolute;
+      left: 0;
+      top: 22px;
+    }
+
+    .quote {
+      font-size: 34px;
+      line-height: 1.28;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      color: #153A6B;
+      max-width: 11.2in;
+    }
+
+    .tag {
+      display: inline-block;
+      background: #E8C56B;
+      color: #153A6B;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      border-radius: 999px;
+      margin-bottom: 16px;
+    }
+
+    .big-prazo {
+      font-size: 72px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: #153A6B;
+      margin: 8px 0 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <section class="slide bg-navy">
+    <div class="tag">Santos / SP</div>
+    <div class="plus">+</div>
+    <h1 style="margin-top:22px; font-size:84px;">Cidade+</h1>
+    <div class="bar gold"></div>
+    <p style="font-size:26px; max-width:10in; color:#E8EDF4;">
+      App para o cidadão reportar problemas da cidade e acompanhar no mapa.
+    </p>
+    <div class="cover-meta">
+      <div>
+        <strong>Equipe</strong>
+        Ana Carolina · Carlos Eduardo · Caio Henrique · Pamella
+      </div>
+      <div>
+        <strong>Entrega</strong>
+        26 de novembro de 2026
+      </div>
+      <div>
+        <strong>Plataformas</strong>
+        Android e iOS
+      </div>
+    </div>
+  </section>
+
+  <section class="slide bg-cream">
+    <p class="eyebrow">Roteiro</p>
+    <h2>Três falas. Uma apresentação.</h2>
+    <div class="bar"></div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="num">1</div>
+        <h3>A ideia</h3>
+        <p>O problema em Santos, o que o Cidade+ resolve e o prazo do projeto.</p>
+      </div>
+      <div class="card">
+        <div class="num green">2</div>
+        <h3>O app e as tecnologias</h3>
+        <p>Como o cidadão usa, as regras do produto e por que escolhemos cada ferramenta.</p>
+      </div>
+      <div class="card">
+        <div class="num gold">3</div>
+        <h3>Status e futuro</h3>
+        <p>O que já está pronto, o que ainda falta e o que vem depois do MVP.</p>
+      </div>
+    </div>
+    <div class="footer"><span>Cidade+</span><span>6 a 8 minutos</span></div>
+  </section>
+
+  <section class="slide bg-navy">
+    <p class="eyebrow">Pessoa 1</p>
+    <h1 style="margin-top:48px; font-size:76px;">A ideia<br>do projeto</h1>
+    <div class="bar gold"></div>
+    <p style="font-size:24px; color:#C7D3E3;">Santos precisa de um canal único para reportar e acompanhar problemas da cidade.</p>
+    <div class="footer"><span>Cidade+</span><span>01 / ideia</span></div>
+  </section>
+
+  <section class="slide bg-cream">
+    <p class="eyebrow">O problema</p>
+    <h2>Relatos espalhados. Pouca transparência.</h2>
+    <div class="bar"></div>
+    <ul class="clean">
+      <li>Não existe um canal único para o morador reportar buraco, calçada, iluminação ou lixo.</li>
+      <li>As informações ficam soltas — WhatsApp, redes, ouvidos da rua.</li>
+      <li>Depois do relato, é difícil saber o que aconteceu.</li>
+    </ul>
+    <div class="footer"><span>Cidade+</span><span>Santos / SP</span></div>
+  </section>
+
+  <section class="slide bg-cream">
+    <p class="eyebrow">A solução</p>
+    <h2>Um app do cidadão para a cidade.</h2>
+    <div class="bar"></div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="num">1</div>
+        <h3>Registra</h3>
+        <p>O morador tira uma foto, marca o local e descreve o problema.</p>
+      </div>
+      <div class="card">
+        <div class="num green">2</div>
+        <h3>Aparece no mapa</h3>
+        <p>A ocorrência fica visível para a comunidade — o problema, não a pessoa.</p>
+      </div>
+      <div class="card">
+        <div class="num gold">3</div>
+        <h3>Acompanha</h3>
+        <p>No futuro, a gestão da cidade também vê e atualiza o status.</p>
+      </div>
+    </div>
+    <div class="footer"><span>Cidade+</span><span>Participação cidadã</span></div>
+  </section>
+
+  <section class="slide bg-white">
+    <p class="eyebrow">Prazo</p>
+    <h2>Entrega do projeto</h2>
+    <div class="bar"></div>
+    <p class="big-prazo">26 / nov / 2026</p>
+    <p class="muted" style="font-size:24px; max-width:10in;">
+      Aplicativo mobile para cidadãos de Santos. Android e iOS, com o mesmo código.
+    </p>
+    <div class="footer"><span>Cidade+</span><span>Gestão pública</span></div>
+  </section>
+
+  <section class="slide bg-green">
+    <p class="eyebrow">Pessoa 2</p>
+    <h1 style="margin-top:48px; font-size:72px;">Funcionalidades<br>e tecnologias</h1>
+    <div class="bar gold"></div>
+    <p style="font-size:24px; color:#D7EDE3;">O que o app faz hoje — e por que escolhemos estas ferramentas.</p>
+    <div class="footer"><span>Cidade+</span><span>02 / produto</span></div>
+  </section>
+
+  <section class="slide bg-cream">
+    <p class="eyebrow">Como funciona</p>
+    <h2>O fluxo do cidadão</h2>
+    <div class="bar"></div>
+    <div class="flow">
+      <div class="step">
+        <div class="num">1</div>
+        <strong>Conta + CEP</strong>
+        <p>Cadastro com CEP de Santos. O sistema descobre o bairro.</p>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <strong>Feed e mapa</strong>
+        <p>Login, lista de ocorrências e visualização no mapa da cidade.</p>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <strong>Nova ocorrência</strong>
+        <p>Foto obrigatória e GPS. Sem foto, não envia.</p>
+      </div>
+      <div class="step">
+        <div class="num">4</div>
+        <strong>Voto da rua</strong>
+        <p>A comunidade marca se é útil, se continua ou se está errado.</p>
+      </div>
+    </div>
+    <div class="footer"><span>Cidade+</span><span>Fluxo principal</span></div>
+  </section>
+
+  <section class="slide bg-cream">
+    <p class="eyebrow">Regras do produto</p>
+    <h2>O que torna o Cidade+ diferente</h2>
+    <div class="bar"></div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Só no próprio bairro</h3>
+        <p>O registro só vale dentro do polígono do bairro do usuário. Essa regra roda no servidor, não só no celular.</p>
+      </div>
+      <div class="card">
+        <h3>O mapa mostra o problema</h3>
+        <p>No mapa público aparece a ocorrência — não quem reportou. Privacidade desde o desenho.</p>
+      </div>
+      <div class="card">
+        <h3>Foto e GPS</h3>
+        <p>Foto é obrigatória. A localização vem do aparelho, para o ponto ficar no lugar certo.</p>
+      </div>
+      <div class="card">
+        <h3>Voto da comunidade</h3>
+        <p>Útil, ainda existe ou informação errada. A rua ajuda a validar o que entra no mapa.</p>
+      </div>
+    </div>
+    <div class="footer"><span>Cidade+</span><span>Regras no servidor</span></div>
+  </section>
+
+  <section class="slide bg-cream">
+    <p class="eyebrow">Stack</p>
+    <h2>Por que essas tecnologias</h2>
+    <div class="bar"></div>
+    <div class="grid-5">
+      <div class="card">
+        <h3>Expo + RN</h3>
+        <p>Android e iOS no mesmo código. Testa no celular sem gerar instalador o tempo todo.</p>
+      </div>
+      <div class="card">
+        <h3>Fastify</h3>
+        <p>API em Node. As regras do produto ficam no servidor.</p>
+      </div>
+      <div class="card">
+        <h3>PostGIS</h3>
+        <p>Sabe se o ponto está <strong>dentro</strong> do bairro — não só “perto”.</p>
+      </div>
+      <div class="card">
+        <h3>Prisma</h3>
+        <p>Organiza o banco e as migrações sem complicar o time.</p>
+      </div>
+      <div class="card">
+        <h3>JWT</h3>
+        <p>Login e papéis: cidadão, gestor e admin.</p>
+      </div>
+    </div>
+    <div class="footer"><span>Cidade+</span><span>Por quê, não só o quê</span></div>
+  </section>
+
+  <section class="slide bg-white">
+    <p class="eyebrow">Infra do time</p>
+    <h2>Docker: escolha de aprendizado</h2>
+    <div class="bar"></div>
+    <div class="grid-2" style="margin-top:36px;">
+      <div class="card">
+        <h3>Não era obrigatório</h3>
+        <p>Dava para instalar o PostgreSQL direto no Windows. O MVP não depende de container.</p>
+      </div>
+      <div class="card">
+        <h3>Usamos mesmo assim</h3>
+        <p>Para ganhar experiência com Docker e deixar o ambiente igual para todo o time.</p>
+      </div>
+    </div>
+    <div class="footer"><span>Cidade+</span><span>Padronizar + aprender</span></div>
+  </section>
+
+  <section class="slide bg-navy">
+    <p class="eyebrow">Pessoa 3</p>
+    <h1 style="margin-top:48px; font-size:72px;">Status, o que falta<br>e o futuro</h1>
+    <div class="bar gold"></div>
+    <p style="font-size:24px; color:#C7D3E3;">A fundação está de pé. Agora é completar o ciclo com a gestão da cidade.</p>
+    <div class="footer"><span>Cidade+</span><span>03 / andamento</span></div>
+  </section>
+
+  <section class="slide bg-cream">
+    <p class="eyebrow">Já feito</p>
+    <h2>A base do produto está no ar</h2>
+    <div class="bar"></div>
+    <div class="grid-3">
+      <div class="card">
+        <h3>Conta e cidade</h3>
+        <p>Cadastro, login e CEP só de Santos — o bairro entra sozinho.</p>
+      </div>
+      <div class="card">
+        <h3>Ocorrência real</h3>
+        <p>Foto, GPS, geofence no bairro, feed, mapa e voto da comunidade.</p>
+      </div>
+      <div class="card">
+        <h3>API e app</h3>
+        <p>Backend com testes. O app já abre no celular pelo Expo.</p>
+      </div>
+    </div>
+    <div class="footer"><span>Cidade+</span><span>Fundação pronta</span></div>
+  </section>
+
+  <section class="slide bg-cream">
+    <p class="eyebrow">Ainda falta</p>
+    <h2>O que fecha o MVP</h2>
+    <div class="bar"></div>
+    <ul class="clean">
+      <li>Painel web para o gestor mudar o status da ocorrência.</li>
+      <li>Polígonos oficiais da Prefeitura — hoje são dois bairros de teste.</li>
+      <li>Envio de foto em nuvem de produção.</li>
+      <li>Notificação no app ainda é só placeholder.</li>
+    </ul>
+    <div class="footer"><span>Cidade+</span><span>Próximos passos</span></div>
+  </section>
+
+  <section class="slide bg-cream">
+    <p class="eyebrow">Depois do MVP</p>
+    <h2>Planos para o futuro</h2>
+    <div class="bar"></div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Primeiro</h3>
+        <p>Painel da gestão e dados oficiais da cidade — para o relato virar atendimento.</p>
+      </div>
+      <div class="card">
+        <h3>Só depois</h3>
+        <p>Inteligência artificial, Gov.br e integração com sistemas da Prefeitura.</p>
+      </div>
+    </div>
+    <div class="footer"><span>Cidade+</span><span>Ordem importa</span></div>
+  </section>
+
+  <section class="slide bg-white">
+    <p class="eyebrow">Em uma frase</p>
+    <p class="quote" style="margin-top:48px;">
+      O cidadão já consegue reportar com foto, no próprio bairro — e a cidade vê o problema, não a pessoa.
+    </p>
+    <div class="bar" style="margin-top:28px;"></div>
+    <div class="footer"><span>Cidade+</span><span>Santos / SP</span></div>
+  </section>
+
+  <section class="slide bg-navy">
+    <div class="plus">+</div>
+    <h1 style="margin-top:28px; font-size:78px;">Obrigado.</h1>
+    <div class="bar gold"></div>
+    <p style="font-size:28px; color:#E8EDF4;">Ficamos abertos a perguntas.</p>
+    <div class="cover-meta">
+      <div>
+        <strong>Cidade+</strong>
+        Relato cidadão · Santos / SP
+      </div>
+      <div>
+        <strong>Entrega</strong>
+        26 de novembro de 2026
+      </div>
+      <div>
+        <strong>Equipe</strong>
+        Ana · Carlos · Caio · Pamella
+      </div>
+    </div>
+  </section>
+
+</body>
+</html>

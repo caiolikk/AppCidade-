@@ -198,7 +198,7 @@
 
 ## Tecnologias
 
-> **Mobile:** React Native + Expo SDK 54 + Expo Router + TypeScript  
+> **Mobile:** React Native + Expo SDK 57 + Expo Router + TypeScript  
 > **Back-end:** Node.js + Fastify  
 > **Banco de dados:** PostgreSQL 16 + PostGIS (Prisma)  
 > **Auth:** JWT + bcrypt, papéis CITIZEN / MANAGER / ADMIN  
@@ -209,7 +209,7 @@ A visão de produto acima permanece. Neste corte da fundação: foto obrigatóri
 
 ## Como executar a fundação
 
-Requisitos: Node 20+, npm 10+, Docker Desktop e Expo Go **SDK 54**.
+Requisitos: Node 20+, npm 10+, Docker Desktop e Expo Go **SDK 57**.
 
 ```bash
 cd AppCidade-

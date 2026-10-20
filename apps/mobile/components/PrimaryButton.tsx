@@ -1,3 +1,4 @@
+import React from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -5,7 +6,7 @@ import {
   Text,
   type GestureResponderEvent,
 } from "react-native";
-import { colors } from "../theme";
+import { theme } from "../theme";
 
 type PrimaryButtonProps = {
   label: string;
@@ -26,12 +27,18 @@ export function PrimaryButton({
     <Pressable
       onPress={onPress}
       disabled={idle}
-      style={[styles.button, idle && styles.disabled]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: idle, busy: loading }}
+      style={({ pressed }) => [
+        styles.button,
+        idle ? styles.disabled : pressed ? styles.pressed : null,
+      ]}
     >
       {loading ? (
-        <ActivityIndicator color="#FFFFFF" />
+        <ActivityIndicator color={theme.colors.text.inverse} />
       ) : (
-        <Text style={styles.label}>{label}</Text>
+        <Text style={[styles.label, idle && styles.labelDisabled]}>{label}</Text>
       )}
     </Pressable>
   );
@@ -40,18 +47,28 @@ export function PrimaryButton({
 const styles = StyleSheet.create({
   button: {
     height: 52,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
+    borderRadius: theme.radius.button,
+    backgroundColor: theme.colors.brand.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
+    paddingHorizontal: theme.spacing.xl,
+    marginTop: theme.spacing.sm,
+  },
+  pressed: {
+    backgroundColor: theme.colors.brand.primaryDark,
+    transform: [{ scale: 0.99 }],
   },
   disabled: {
-    opacity: 0.6,
+    backgroundColor: theme.colors.brand.disabled,
+    opacity: 0.85,
   },
   label: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
+    color: theme.colors.text.inverse,
+    fontSize: theme.typography.size.subtitle,
+    fontWeight: theme.typography.weight.bold,
+    letterSpacing: -0.2,
+  },
+  labelDisabled: {
+    color: "#F3F4F6",
   },
 });

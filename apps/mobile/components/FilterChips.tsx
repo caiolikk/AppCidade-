@@ -1,5 +1,6 @@
+import React from "react";
 import { FlatList, Platform, Pressable, StyleSheet, Text } from "react-native";
-import { colors } from "../theme";
+import { theme } from "../theme";
 
 type FilterChipsProps = {
   filters: string[];
@@ -24,10 +25,14 @@ export function FilterChips({ filters, selected, onSelect }: FilterChipsProps) {
         return (
           <Pressable
             onPress={() => onSelect(item)}
-            android_ripple={{ color: "#D6DEEA", foreground: true }}
+            accessibilityRole="button"
+            accessibilityLabel={`Filtrar por ${item}`}
+            accessibilityState={{ selected: active }}
             style={[styles.chip, active ? styles.chipActive : styles.chipIdle]}
           >
-            <Text style={[styles.label, active && styles.labelActive]}>{item}</Text>
+            <Text style={[styles.label, active ? styles.labelActive : styles.labelIdle]}>
+              {item}
+            </Text>
           </Pressable>
         );
       }}
@@ -42,31 +47,35 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web" ? { overflow: "scroll" as const } : null),
   },
   row: {
-    paddingLeft: 16,
-    paddingRight: 28,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.xs,
     alignItems: "center",
+    gap: 8,
   },
   chip: {
-    borderRadius: 999,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    marginRight: 10,
-    overflow: "hidden",
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    height: 36,
   },
   chipActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: theme.colors.chip.activeBg, // Preto sólido
   },
   chipIdle: {
-    backgroundColor: colors.background,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    backgroundColor: theme.colors.chip.idleBg,
+    borderWidth: 1,
+    borderColor: theme.colors.chip.idleBorder,
   },
   label: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: theme.typography.size.label,
+    fontWeight: theme.typography.weight.medium,
   },
   labelActive: {
-    color: "#FFFFFF",
+    color: theme.colors.chip.activeText, // Branco
+  },
+  labelIdle: {
+    color: theme.colors.chip.idleText, // Preto
   },
 });

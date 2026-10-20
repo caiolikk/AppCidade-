@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -12,11 +12,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBadge } from "../../components/StatusBadge";
 import { useOccurrence } from "../../hooks/use-feed";
 import { api, ApiError } from "../../lib/api";
-import { EVALUATION_LABEL, STATUS_LABEL } from "../../lib/format";
+import { EVALUATION_LABEL } from "../../lib/format";
 import type { EvaluationType } from "../../lib/types";
-import { colors } from "../../theme";
+import { theme } from "../../theme";
 
 const VOTE_TYPES: EvaluationType[] = ["UTIL", "PERSISTE", "INCORRETA"];
 
@@ -31,9 +32,7 @@ export default function OccurrenceDetailScreen() {
   const occurrence = query.data;
 
   async function vote(type: EvaluationType) {
-    if (!id) {
-      return;
-    }
+    if (!id) return;
     setVoteError(null);
     setVoting(type);
     try {
@@ -50,29 +49,48 @@ export default function OccurrenceDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.top}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
+      <View style={styles.topBar}>
+        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color={theme.colors.text.primary} />
         </Pressable>
-        <Text style={styles.kicker}>Ocorrência</Text>
+        <Text style={styles.topTitle}>Detalhes da Ocorrência</Text>
       </View>
 
       {query.isLoading || !occurrence ? (
-        <ActivityIndicator style={styles.loader} color={colors.primary} />
+        <ActivityIndicator style={styles.loader} color={theme.colors.brand.primary} />
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
           {occurrence.thumbnailUrl ? (
-            <Image source={{ uri: occurrence.thumbnailUrl }} style={styles.photo} />
+            <Image
+              source={{ uri: occurrence.thumbnailUrl }}
+              style={styles.photo}
+              resizeMode="cover"
+            />
           ) : null}
+
+          <View style={styles.badgeRow}>
+            <View style={styles.categoryChip}>
+              <Text style={styles.categoryChipText}>{occurrence.category.name}</Text>
+            </View>
+            <StatusBadge status={occurrence.status} />
+          </View>
+
           <Text style={styles.title}>{occurrence.title}</Text>
-          <Text style={styles.meta}>
-            {occurrence.category.name} · {STATUS_LABEL[occurrence.status]}
-          </Text>
+
           {occurrence.description ? (
             <Text style={styles.description}>{occurrence.description}</Text>
           ) : null}
 
-          <Text style={styles.section}>Avaliação da comunidade</Text>
+          <View style={styles.divider} />
+
+          <Text style={styles.sectionHeader}>Avaliação da comunidade</Text>
+          <Text style={styles.sectionHint}>
+            Ajude a validar esta ocorrência para a gestão do município:
+          </Text>
+
           <View style={styles.votes}>
             {VOTE_TYPES.map((type) => (
               <Pressable
@@ -86,6 +104,7 @@ export default function OccurrenceDetailScreen() {
               </Pressable>
             ))}
           </View>
+
           {voteError ? <Text style={styles.error}>{voteError}</Text> : null}
         </ScrollView>
       )}
@@ -96,61 +115,87 @@ export default function OccurrenceDetailScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: theme.colors.background.main,
   },
-  top: {
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
-    paddingBottom: 8,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border.subtle,
   },
-  back: {
+  backBtn: {
     width: 40,
     height: 40,
     alignItems: "center",
     justifyContent: "center",
   },
-  kicker: {
-    color: colors.muted,
-    fontSize: 16,
-    fontWeight: "700",
+  topTitle: {
+    color: theme.colors.text.primary,
+    fontSize: 17,
+    fontWeight: theme.typography.weight.bold,
   },
   loader: {
-    marginTop: 40,
+    marginTop: 60,
   },
   content: {
-    paddingHorizontal: 20,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: 16,
     paddingBottom: 40,
   },
   photo: {
     width: "100%",
     height: 220,
-    borderRadius: 16,
-    backgroundColor: colors.grid,
+    borderRadius: theme.radius.lg,
+    backgroundColor: "#E5E7EB",
     marginBottom: 16,
   },
-  title: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: "800",
+  badgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
   },
-  meta: {
-    color: colors.muted,
-    fontSize: 14,
-    marginTop: 6,
-    marginBottom: 12,
+  categoryChip: {
+    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: theme.radius.pill,
+  },
+  categoryChipText: {
+    fontSize: 12,
+    fontWeight: theme.typography.weight.semiBold,
+    color: theme.colors.text.primary,
+  },
+  title: {
+    color: theme.colors.text.primary,
+    fontSize: 22,
+    fontWeight: theme.typography.weight.bold,
+    letterSpacing: -0.3,
+    marginBottom: 8,
   },
   description: {
-    color: colors.text,
-    fontSize: 16,
+    color: theme.colors.text.primary,
+    fontSize: 15,
     lineHeight: 22,
+    marginTop: 4,
   },
-  section: {
-    marginTop: 24,
-    marginBottom: 10,
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.text,
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme.colors.border.subtle,
+    marginVertical: 24,
+  },
+  sectionHeader: {
+    fontSize: 15,
+    fontWeight: theme.typography.weight.bold,
+    color: theme.colors.text.primary,
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: theme.colors.text.secondary,
+    marginTop: 4,
+    marginBottom: 12,
   },
   votes: {
     flexDirection: "row",
@@ -158,25 +203,29 @@ const styles = StyleSheet.create({
   },
   vote: {
     flex: 1,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.chipBorder,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
     paddingVertical: 12,
+    paddingHorizontal: 4,
     alignItems: "center",
+    backgroundColor: theme.colors.background.subtle,
   },
   voteLabel: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: "700",
+    color: theme.colors.text.primary,
+    fontSize: 11,
+    fontWeight: theme.typography.weight.bold,
     textAlign: "center",
   },
   voteCount: {
-    color: colors.muted,
+    color: theme.colors.brand.primary,
     marginTop: 4,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: theme.typography.weight.bold,
   },
   error: {
-    color: "#B91C1C",
+    color: theme.colors.text.error,
     marginTop: 12,
+    fontSize: 13,
   },
 });

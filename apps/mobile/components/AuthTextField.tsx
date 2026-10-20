@@ -1,8 +1,15 @@
-import { StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from "react-native";
-import { colors } from "../theme";
+import React, { useState } from "react";
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type KeyboardTypeOptions,
+} from "react-native";
+import { theme } from "../theme";
 
 type AuthTextFieldProps = {
-  label: string;
+  label?: string;
   value: string;
   onChangeText: (value: string) => void;
   placeholder?: string;
@@ -22,20 +29,24 @@ export function AuthTextField({
   autoCapitalize = "none",
   autoComplete,
 }: AuthTextFieldProps) {
+  const [focused, setFocused] = useState(false);
+
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.subtitle}
+        placeholderTextColor={theme.colors.text.muted}
         secureTextEntry={secureTextEntry}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         autoComplete={autoComplete}
         autoCorrect={false}
-        style={styles.input}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={[styles.input, focused && styles.inputFocused]}
       />
     </View>
   );
@@ -43,22 +54,25 @@ export function AuthTextField({
 
 const styles = StyleSheet.create({
   wrap: {
-    marginBottom: 14,
+    marginBottom: theme.spacing.md,
   },
   label: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: "700",
-    marginBottom: 6,
+    color: theme.colors.text.primary,
+    fontSize: theme.typography.size.label,
+    fontWeight: theme.typography.weight.medium,
+    marginBottom: theme.spacing.xs,
   },
   input: {
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+    borderRadius: theme.radius.input,
+    paddingHorizontal: theme.spacing.lg,
     height: 48,
-    color: colors.text,
-    fontSize: 16,
-    backgroundColor: colors.background,
+    color: theme.colors.text.primary,
+    fontSize: theme.typography.size.body,
+    backgroundColor: theme.colors.background.input,
+  },
+  inputFocused: {
+    borderColor: theme.colors.border.focus,
   },
 });

@@ -3,8 +3,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -16,12 +17,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { AuthTextField } from "../../components/AuthTextField";
+import { CategorySelectGrid } from "../../components/CategorySelectGrid";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { useCategories } from "../../hooks/use-feed";
 import { api, apiUploadImage, ApiError } from "../../lib/api";
 import { useAuthStore } from "../../store/auth";
-import { colors } from "../../theme";
+import { theme } from "../../theme";
 
 export default function CreateScreen() {
   const router = useRouter();
@@ -29,7 +30,6 @@ export default function CreateScreen() {
   const neighborhood = useAuthStore((state) => state.user?.neighborhood);
   const categoriesQuery = useCategories();
 
-  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -49,7 +49,7 @@ export default function CreateScreen() {
     setGeoAllowed(false);
     const permission = await Location.requestForegroundPermissionsAsync();
     if (!permission.granted) {
-      setGeoMessage("Autorize a localização para registrar no seu bairro.");
+      setGeoMessage("Autorize o GPS para validar o ponto no seu bairro.");
       return;
     }
 
@@ -76,55 +76,63 @@ export default function CreateScreen() {
     }
   }
 
-  async function pickPhoto(fromCamera: boolean) {
+  async function pickPhoto() {
     setError(null);
-    const permission = fromCamera
-      ? await ImagePicker.requestCameraPermissionsAsync()
-      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const cameraPerm = await ImagePicker.requestCameraPermissionsAsync();
+    const mediaPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (!permission.granted) {
-      setError(
-        fromCamera
-          ? "Autorize a câmera para fotografar a evidência."
-          : "Autorize a galeria para anexar a evidência.",
-      );
+    if (!cameraPerm.granted && !mediaPerm.granted) {
+      setError("Permita acesso à câmera e galeria para anexar a evidência.");
       return;
     }
 
-    const result = fromCamera
-      ? await ImagePicker.launchCameraAsync({
-          mediaTypes: ["images"],
-          quality: 0.7,
-        })
-      : await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ["images"],
-          quality: 0.7,
-        });
+    // Permitir escolha de câmera ou biblioteca
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      quality: 0.7,
+    });
 
     if (result.canceled || !result.assets[0]) {
+      // Se cancelar a câmera, tenta abrir a biblioteca
+      const libResult = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 0.7,
+      });
+      if (!libResult.canceled && libResult.assets[0]) {
+        setPhotoUri(libResult.assets[0].uri);
+        setPhotoType(libResult.assets[0].mimeType ?? "image/jpeg");
+      }
       return;
     }
 
-    const asset = result.assets[0];
-    setPhotoUri(asset.uri);
-    setPhotoType(asset.mimeType ?? "image/jpeg");
+    setPhotoUri(result.assets[0].uri);
+    setPhotoType(result.assets[0].mimeType ?? "image/jpeg");
   }
 
   async function handleSubmit() {
     setError(null);
 
+    if (!categoryId) {
+      setError("Por favor, selecione uma categoria.");
+      return;
+    }
+    if (!description.trim()) {
+      setError("Por favor, digite a descrição do problema.");
+      return;
+    }
     if (!photoUri) {
-      setError("A ocorrência precisa de pelo menos uma foto.");
+      setError("A ocorrência precisa de uma evidência fotográfica.");
       return;
     }
     if (!coords) {
       setError("Não foi possível obter sua localização.");
       return;
     }
-    if (!categoryId) {
-      setError("Escolha uma categoria.");
-      return;
-    }
+
+    const selectedCategory = categoriesQuery.data?.find((c) => c.id === categoryId);
+    const categoryName = selectedCategory?.name ?? "Ocorrência";
+    // Derivação harmoniosa do título para atender ao contrato da API
+    const title = `${categoryName}: ${description.trim().slice(0, 40)}`;
 
     setLoading(true);
     try {
@@ -137,7 +145,7 @@ export default function CreateScreen() {
       await api("/occurrences", {
         body: {
           title,
-          description,
+          description: description.trim(),
           latitude: coords.latitude,
           longitude: coords.longitude,
           categoryId,
@@ -165,89 +173,70 @@ export default function CreateScreen() {
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.title}>Nova ocorrência</Text>
-          <Text style={styles.subtitle}>
-            {neighborhood ?? "Seu bairro"} · foto obrigatória · só no seu polígono
-          </Text>
-
-          {photoUri ? (
-            <Image source={{ uri: photoUri }} style={styles.preview} />
-          ) : (
-            <View style={styles.previewEmpty}>
-              <Ionicons name="camera-outline" size={28} color={colors.muted} />
-              <Text style={styles.previewHint}>Evidência fotográfica</Text>
-            </View>
-          )}
-
-          <View style={styles.photoActions}>
-            <Pressable style={styles.photoButton} onPress={() => void pickPhoto(true)}>
-              <Text style={styles.photoButtonText}>Câmera</Text>
-            </Pressable>
-            <Pressable style={styles.photoButton} onPress={() => void pickPhoto(false)}>
-              <Text style={styles.photoButtonText}>Galeria</Text>
-            </Pressable>
+          <View style={styles.header}>
+            <Text style={styles.title}>Nova Ocorrência</Text>
+            <View style={styles.greenBar} />
           </View>
 
-          <Text style={styles.geo}>
-            {coords
-              ? `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`
-              : "Obtendo localização…"}
-          </Text>
-          {geoMessage ? (
-            <Text style={[styles.geoStatus, geoAllowed ? styles.geoOk : styles.geoBad]}>
-              {geoMessage}
-            </Text>
-          ) : null}
-          <Pressable onPress={() => void locate()}>
-            <Text style={styles.retry}>Atualizar localização</Text>
-          </Pressable>
-
-          <AuthTextField
-            label="Título"
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Ex.: Buraco na calçada"
-            autoCapitalize="sentences"
+          <Text style={styles.label}>Categoria</Text>
+          <CategorySelectGrid
+            categories={categoriesQuery.data ?? []}
+            selectedId={categoryId}
+            onSelect={setCategoryId}
           />
 
           <Text style={styles.label}>Descrição</Text>
           <TextInput
             value={description}
-            onChangeText={(value) => setDescription(value.slice(0, 500))}
-            placeholder="Descreva o problema"
-            placeholderTextColor={colors.subtitle}
+            onChangeText={(val) => setDescription(val.slice(0, 500))}
+            placeholder="Digite a descrição"
+            placeholderTextColor={theme.colors.text.muted}
             multiline
+            numberOfLines={4}
             style={styles.textarea}
           />
           <Text style={styles.counter}>{description.length}/500</Text>
 
-          <Text style={styles.label}>Categoria</Text>
-          <View style={styles.categories}>
-            {(categoriesQuery.data ?? []).map((item) => {
-              const active = item.id === categoryId;
-              return (
-                <Pressable
-                  key={item.id}
-                  onPress={() => setCategoryId(item.id)}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {item.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Text style={styles.label}>Foto</Text>
+          {photoUri ? (
+            <View style={styles.photoPreviewContainer}>
+              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+              <Pressable style={styles.changePhotoBtn} onPress={() => void pickPhoto()}>
+                <Text style={styles.changePhotoText}>Trocar foto</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable style={styles.photoBox} onPress={() => void pickPhoto()}>
+              <Ionicons name="camera-outline" size={26} color={theme.colors.text.secondary} />
+              <Text style={styles.photoBoxText}>Tirar foto ou escolher da galeria</Text>
+            </Pressable>
+          )}
+
+          <Text style={styles.microCopy}>*Permita acesso à câmera e ao GPS</Text>
+
+          {geoMessage ? (
+            <Text
+              style={[
+                styles.geoStatus,
+                geoAllowed ? styles.geoSuccess : styles.geoWarning,
+              ]}
+            >
+              {geoMessage}
+            </Text>
+          ) : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <PrimaryButton
-            label="Registrar"
-            onPress={() => void handleSubmit()}
-            loading={loading}
-            disabled={!photoUri || !coords || !categoryId}
-          />
+          <View style={styles.btnWrap}>
+            <PrimaryButton
+              label="Enviar Ocorrência"
+              onPress={() => void handleSubmit()}
+              loading={loading}
+              disabled={!categoryId || !description.trim() || !photoUri || !coords}
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -257,138 +246,118 @@ export default function CreateScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: theme.colors.background.main,
   },
   flex: {
     flex: 1,
   },
   content: {
-    paddingHorizontal: 20,
+    paddingHorizontal: theme.spacing.lg,
     paddingTop: 12,
     paddingBottom: 40,
   },
+  header: {
+    marginBottom: 16,
+  },
   title: {
-    color: colors.text,
-    fontSize: 28,
-    fontWeight: "800",
+    color: theme.colors.text.primary,
+    fontSize: 22,
+    fontWeight: theme.typography.weight.bold,
   },
-  subtitle: {
-    color: colors.muted,
-    fontSize: 14,
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  preview: {
-    width: "100%",
-    height: 180,
-    borderRadius: 16,
-    backgroundColor: colors.grid,
-    marginBottom: 12,
-  },
-  previewEmpty: {
-    height: 140,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: colors.chipBorder,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-    gap: 8,
-  },
-  previewHint: {
-    color: colors.muted,
-    fontSize: 14,
-  },
-  photoActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 14,
-  },
-  photoButton: {
-    flex: 1,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  photoButtonText: {
-    color: colors.text,
-    fontWeight: "700",
-  },
-  geo: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  geoStatus: {
-    marginTop: 4,
-    fontSize: 13,
-  },
-  geoOk: {
-    color: "#15803D",
-  },
-  geoBad: {
-    color: "#B91C1C",
-  },
-  retry: {
-    color: colors.primary,
-    fontWeight: "700",
+  greenBar: {
+    height: 3,
+    width: 60,
+    backgroundColor: theme.colors.brand.primary,
+    borderRadius: 2,
     marginTop: 6,
-    marginBottom: 16,
   },
   label: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: "700",
-    marginBottom: 6,
+    color: theme.colors.text.primary,
+    fontSize: theme.typography.size.label,
+    fontWeight: theme.typography.weight.bold,
+    marginTop: 8,
+    marginBottom: 4,
   },
   textarea: {
-    minHeight: 96,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: colors.text,
-    fontSize: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+    borderRadius: theme.radius.input,
+    padding: theme.spacing.md,
+    height: 100,
+    color: theme.colors.text.primary,
+    fontSize: theme.typography.size.body,
     textAlignVertical: "top",
+    backgroundColor: theme.colors.background.main,
   },
   counter: {
-    color: colors.muted,
-    fontSize: 12,
-    textAlign: "right",
-    marginTop: 4,
-    marginBottom: 14,
+    alignSelf: "flex-end",
+    fontSize: 11,
+    color: theme.colors.text.muted,
+    marginTop: 2,
+    marginBottom: 6,
   },
-  categories: {
+  photoBox: {
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+    borderRadius: theme.radius.input,
+    height: 70,
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: theme.colors.background.main,
   },
-  chip: {
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  photoBoxText: {
+    color: theme.colors.text.secondary,
+    fontSize: 13,
   },
-  chipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  photoPreviewContainer: {
+    position: "relative",
+    borderRadius: theme.radius.input,
+    overflow: "hidden",
+    height: 140,
   },
-  chipText: {
-    color: colors.text,
-    fontWeight: "600",
+  photoPreview: {
+    width: "100%",
+    height: "100%",
   },
-  chipTextActive: {
+  changePhotoBtn: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: theme.radius.pill,
+  },
+  changePhotoText: {
     color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: theme.typography.weight.semiBold,
+  },
+  microCopy: {
+    fontSize: 11,
+    color: theme.colors.text.muted,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  geoStatus: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  geoSuccess: {
+    color: theme.colors.brand.primary,
+  },
+  geoWarning: {
+    color: "#D97706",
   },
   error: {
-    color: "#B91C1C",
-    fontSize: 14,
-    marginBottom: 8,
+    color: theme.colors.text.error,
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  btnWrap: {
+    marginTop: 20,
   },
 });

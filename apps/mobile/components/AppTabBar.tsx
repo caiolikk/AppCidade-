@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "expo-router/js-tabs";
+import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors } from "../theme";
+import { theme } from "../theme";
 
 const ICONS: Record<
   string,
@@ -10,6 +11,7 @@ const ICONS: Record<
 > = {
   index: { on: "home", off: "home-outline" },
   map: { on: "map", off: "map-outline" },
+  create: { on: "add", off: "add" },
   notifications: { on: "notifications", off: "notifications-outline" },
   account: { on: "person", off: "person-outline" },
 };
@@ -18,7 +20,7 @@ export function AppTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
       {state.routes.map((route, index) => {
         const focused = state.index === index;
         const onPress = () => {
@@ -33,31 +35,23 @@ export function AppTabBar({ state, navigation }: BottomTabBarProps) {
           }
         };
 
-        if (route.name === "create") {
-          return (
-            <Pressable
-              key={route.key}
-              onPress={onPress}
-              style={styles.fabHit}
-              android_ripple={{ color: "#2C5A94", foreground: true }}
-            >
-              <View style={styles.fab}>
-                <Ionicons name="add" size={32} color="#FFFFFF" />
-              </View>
-            </Pressable>
-          );
-        }
+        const iconConfig = ICONS[route.name] ?? { on: "ellipse", off: "ellipse-outline" };
+        const iconName = focused ? iconConfig.on : iconConfig.off;
+        const isCreate = route.name === "create";
 
         return (
-          <Pressable key={route.key} onPress={onPress} style={styles.item}>
+          <Pressable
+            key={route.key}
+            onPress={onPress}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: focused }}
+            accessibilityLabel={route.name}
+            style={styles.item}
+          >
             <Ionicons
-              name={
-                focused
-                  ? (ICONS[route.name]?.on ?? "ellipse")
-                  : (ICONS[route.name]?.off ?? "ellipse-outline")
-              }
-              size={26}
-              color={focused ? colors.primary : "#3F3F3F"}
+              name={iconName}
+              size={isCreate ? 30 : 25}
+              color={focused ? theme.colors.text.primary : "#374151"}
             />
           </Pressable>
         );
@@ -69,39 +63,24 @@ export function AppTabBar({ state, navigation }: BottomTabBarProps) {
 const styles = StyleSheet.create({
   bar: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "space-around",
+    backgroundColor: theme.colors.background.tabBar, // #EDF6EE
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#E5E7EB",
-    paddingTop: 8,
+    borderTopColor: "rgba(0,0,0,0.06)",
     shadowColor: "#000",
     shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: -2 },
-    elevation: 12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: -3 },
+    elevation: 8,
   },
   item: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    height: 48,
-  },
-  fabHit: {
-    flex: 1,
-    alignItems: "center",
-    marginTop: -18,
-  },
-  fab: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: colors.primary,
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    height: 44,
   },
 });

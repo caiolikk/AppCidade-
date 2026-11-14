@@ -14,9 +14,11 @@
       "backgroundColor": "#0E6B4F"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cidadeplus.app"
     },
     "android": {
+      "package": "com.cidadeplus.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0E6B4F"

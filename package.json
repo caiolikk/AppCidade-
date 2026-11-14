@@ -12,6 +12,11 @@
     "dev:api": "npm run dev -w @cidade-plus/api",
     "dev:mobile": "npm run dev -w @cidade-plus/mobile",
     "dev:mobile:tunnel": "npm run dev:tunnel -w @cidade-plus/mobile",
+    "dev:mobile:go": "npm run dev:go -w @cidade-plus/mobile",
+    "build:dev:android": "npm run build:dev:android -w @cidade-plus/mobile",
+    "build:dev:ios": "npm run build:dev:ios -w @cidade-plus/mobile",
+    "build:preview:android": "npm run build:preview:android -w @cidade-plus/mobile",
+    "db:ps": "docker compose ps",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
@@ -44,6 +49,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
-    "@types/react": "19.1.17"
+    "@types/react": "19.1.17",
+    "expo-font": "~14.0.12"
   }
 }

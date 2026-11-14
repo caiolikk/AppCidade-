@@ -1,3 +1,10 @@
+---
+status: implementado
+tema: fundação (ETAPAS 0–12)
+atualizado: 2026-11-13
+nota: "O status no corpo do texto (ETAPA 3) está desatualizado; a fundação foi fechada na ETAPA 13. O upload está quebrado no clone atual (PROBLEMS P-001)."
+---
+
 # Cidade+ — Auditoria da fundação (ETAPA 0)
 
 **Data:** 2026-08-23  

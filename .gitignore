@@ -56,6 +56,11 @@ expo-env.d.ts
 *.aab
 *.ipa
 
+# Pastas nativas geradas pelo Expo (CNG / prebuild). A fonte da verdade é app.json + app.config.js.
+# Se forem versionadas, o EAS passa a ignorar o app.json. Ver docs/DECISIONS.md D-015.
+apps/mobile/android/
+apps/mobile/ios/
+
 # Android
 apps/mobile/android/app/build/
 apps/mobile/android/build/
@@ -82,7 +87,7 @@ docker-data/
 *.pid
 
 # Uploads locais (fallback sem Cloudinary)
-uploads/
+/uploads/
 apps/api/uploads/
 
 # Test / coverage

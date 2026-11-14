@@ -209,7 +209,9 @@ A visão de produto acima permanece. Neste corte da fundação: foto obrigatóri
 
 ## Como executar a fundação
 
-Requisitos: Node 20+, npm 10+, Docker Desktop e Expo Go **SDK 54**.
+> **Guia completo** (primeira configuração, development build, EAS, quando gerar novo build, Docker explicado): [`docs/AMBIENTE_DEV.md`](docs/AMBIENTE_DEV.md).
+
+Requisitos: Node 20+, npm 10+, Docker Desktop aberto e o **development build** do Cidade+ instalado no celular (o Expo Go SDK 54 é só um fallback, via `npm run dev:mobile:go`).
 
 ```bash
 cd AppCidade-
@@ -223,7 +225,7 @@ npm run dev:mobile
 ```
 
 - API: `http://127.0.0.1:3333/health`
-- App: ler o QR no Expo Go (mesmo Wi-Fi). Se o celular não alcançar a API, libere a porta **3333** no firewall ou defina `EXPO_PUBLIC_API_URL` no `.env`.
+- App: abrir o app Cidade+ (dev build) no celular, no mesmo Wi-Fi, e escolher o servidor Metro. Se o celular não alcançar a API, libere as portas **3333** e **8081** no firewall ou defina `EXPO_PUBLIC_API_URL` em **`apps/mobile/.env`** (o Expo não lê o `.env` da raiz).
 - Contas seed: `admin@cidade.plus` / `admin1234` e `gestor@cidade.plus` / `gestor1234`
 - CEP de Santos para cadastro de cidadão: `11030-000` (ViaCEP devolve Ponta da Praia)
 - Testes: `npm test` (API precisa do Postgres no ar)

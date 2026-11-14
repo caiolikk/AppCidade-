@@ -1,3 +1,10 @@
+---
+status: implementado
+tema: fundação — fechamento e testes da API
+atualizado: 2026-11-13
+nota: "Testes descritos em 2026-08-24; não reexecutados neste clone (exigem Postgres e o upload.routes ausente, P-001)."
+---
+
 # Cidade+ — Relatório da ETAPA 13 (fundação)
 
 **Data:** 2026-08-24  

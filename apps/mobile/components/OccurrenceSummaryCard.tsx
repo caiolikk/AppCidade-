@@ -1,89 +1,61 @@
 import { StyleSheet, Text, View } from "react-native";
 import type { OccurrenceCardModel } from "../lib/format";
-import { colors } from "../theme";
+import { colors, softShadow } from "../theme";
+import { StatusDot, StatusPill } from "./StatusPill";
 
 type OccurrenceSummaryCardProps = {
   occurrence: OccurrenceCardModel;
+  /** Versão flutuante (mapa): fundo com sombra e largura fixa. */
   compact?: boolean;
 };
 
-export function OccurrenceSummaryCard({
-  occurrence,
-  compact = false,
-}: OccurrenceSummaryCardProps) {
+/**
+ * Figma: linha "Ocorrências" (Minha Conta / Notificações) — bolinha de status, título
+ * semibold 16, "Categoria • há X" 12 e pílula de status.
+ */
+export function OccurrenceSummaryCard({ occurrence, compact = false }: OccurrenceSummaryCardProps) {
   return (
-    <View style={[styles.card, compact && styles.compact]}>
-      {compact ? null : <Text style={styles.kicker}>Resumo da Ocorrência</Text>}
-      <Text style={styles.title} numberOfLines={2}>
-        {occurrence.title}
-      </Text>
-      <Text style={styles.meta}>
-        Reportado há {occurrence.reportedAgo} - {occurrence.evaluations} avaliações
-      </Text>
-      <View style={styles.tags}>
-        <View style={[styles.tag, styles.tagGrey]}>
-          <Text style={styles.tagText}>{occurrence.category}</Text>
-        </View>
-        {occurrence.tag ? (
-          <View style={[styles.tag, styles.tagYellow]}>
-            <Text style={styles.tagText}>{occurrence.tag}</Text>
-          </View>
-        ) : null}
+    <View style={[styles.row, compact && [styles.floating, softShadow]]}>
+      <StatusDot status={occurrence.status} />
+      <View style={styles.texts}>
+        <Text style={styles.title} numberOfLines={1}>
+          {occurrence.title}
+        </Text>
+        <Text style={styles.meta} numberOfLines={1}>
+          {occurrence.category} • há {occurrence.reportedAgo}
+        </Text>
       </View>
+      <StatusPill status={occurrence.status} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.background,
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 15,
+    padding: 15,
+  },
+  floating: {
+    width: 320,
+    marginRight: 10,
     borderRadius: 20,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
+    backgroundColor: colors.background,
   },
-  compact: {
-    width: 280,
-    marginRight: 12,
-  },
-  kicker: {
-    color: colors.subtitle,
-    fontSize: 13,
-    marginBottom: 6,
+  texts: {
+    flex: 1,
+    gap: 2,
   },
   title: {
     color: colors.text,
-    fontSize: 18,
-    fontWeight: "800",
-    marginBottom: 6,
+    fontSize: 16,
+    lineHeight: 19,
+    fontWeight: "600",
   },
   meta: {
-    color: colors.subtitle,
-    fontSize: 13,
-    marginBottom: 12,
-  },
-  tags: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  tag: {
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  tagGrey: {
-    backgroundColor: colors.tagGrey,
-  },
-  tagYellow: {
-    backgroundColor: colors.tagYellow,
-  },
-  tagText: {
     color: colors.text,
     fontSize: 12,
-    fontWeight: "600",
+    lineHeight: 14,
   },
 });

@@ -50,3 +50,34 @@ atualizado: 2026-11-13
 
 ## P-008 — Expo Go incompatível após atualização da loja
 **Status:** Contornado por [[DECISIONS]] D-014 (dev build). Substitui o contorno de P-002, que era migrar o SDK.
+
+## P-009 — Erros 4xx do Fastify viravam 500 "Erro interno."
+**Status:** Resolvido (2026-11-14)
+- **Sintoma:** JSON malformado ou corpo com `Content-Length` errado retornava 500, e o app mostrava "Erro interno.".
+- **Causa raiz:** o `setErrorHandler` de `apps/api/src/app.ts` só tratava `HttpError` e `ZodError`; qualquer outro erro, incluindo os 4xx do Fastify (`FST_ERR_CTP_*`), caía no 500.
+- **Solução:** repassar `statusCode` 4xx com "Requisição inválida.".
+- **Descoberto por:** teste E2E com `curl` no Git Bash, que calcula o `Content-Length` errado com acentos em `-d`. Para testes manuais, use `--data-binary @arquivo.json`.
+
+## P-010 — `prisma generate` falha com EPERM durante `npm install`
+**Status:** Contornado (conhecido no Windows)
+- **Sintoma:** `npm install` termina com erro no `postinstall` (`EPERM: operation not permitted, rename ... query_engine-windows.dll.node`).
+- **Causa:** a API rodando (`npm run dev:api`) mantém a DLL do Prisma aberta.
+- **Solução:** pare a API e rode `npx prisma generate`, ou instale com `--ignore-scripts` quando o schema não mudou (o client existente continua válido).
+
+## P-011 — SVGs exportados do Figma invisíveis (avatar e "Voltar")
+**Status:** Resolvido (2026-11-14)
+- **Sintoma:** `ICON - USER` e `Voltar` não aparecem no app.
+- **Causa:** no próprio Figma esses componentes estão com **opacidade 0** (são só áreas de toque do protótipo); o export traz `opacity="0"`, e o avatar ainda vem com `viewBox` incompatível. Os screenshots do Figma confirmam que eles não aparecem no design.
+- **Solução:** não exibir (fidelidade ao design). O detalhe da ocorrência usa a seta visível da busca do mapa como "voltar". Antes de usar um asset exportado, confira se ele está visível no screenshot do frame.
+
+## P-012 — Web: `LocationEventEmitter.removeSubscription is not a function`
+**Status:** Contornado (2026-11-14)
+- **Sintoma:** na versão web, sair de uma tela que assiste a localização derruba o app.
+- **Causa raiz:** o `expo-location` 19 chama `removeSubscription` no emitter; no Android/iOS ele é um `LegacyEventEmitter` (tem o método), mas na **web** é o `EventEmitter` novo (não tem). Não afeta o aparelho.
+- **Solução:** `safeRemove()` em `hooks/use-user-location.ts` (try/catch ao remover a assinatura).
+
+## P-013 — Pins do mapa cortados no Android
+**Status:** Resolvido (2026-11-14) · falta confirmar no aparelho
+- **Sintoma:** só o quadrante superior esquerdo do pin aparecia (print do usuário).
+- **Causa raiz:** o `react-native-maps` converte Views filhas de `<Marker>` em **snapshot**. O pin tinha imagem absoluta maior que o container (recorte de 151%), `overflow: hidden` aninhado, `elevation`, tamanho dinâmico e `tracksViewChanges` desligado por timer → bitmap do tamanho errado.
+- **Solução:** pins **pré-renderizados** (`Marker image`, @2x/@3x) gerados por `apps/mobile/scripts/generate-pins.ps1`. Evite Views complexas dentro de `Marker` no Android; se precisar, use tamanho fixo e sem filhos que extrapolem.

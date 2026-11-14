@@ -20,6 +20,14 @@ const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
+  /**
+   * Regra "só criar ocorrência dentro do polígono do bairro residencial" (D-008).
+   * Desativada temporariamente (D-018): o padrão é "false". Para reativar, use "true" no .env.
+   */
+  OCCURRENCE_GEOFENCE_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
 });
 
 export const env = envSchema.parse(process.env);

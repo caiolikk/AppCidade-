@@ -1,8 +1,21 @@
 import { z } from "zod";
 
+// Validação de coordenadas no schema: vale sempre, com ou sem geofence (D-018).
+const latitudeSchema = z
+  .number({ invalid_type_error: "Latitude deve ser um número." })
+  .finite("Latitude inválida.")
+  .min(-90, "Latitude deve estar entre -90 e 90.")
+  .max(90, "Latitude deve estar entre -90 e 90.");
+
+const longitudeSchema = z
+  .number({ invalid_type_error: "Longitude deve ser um número." })
+  .finite("Longitude inválida.")
+  .min(-180, "Longitude deve estar entre -180 e 180.")
+  .max(180, "Longitude deve estar entre -180 e 180.");
+
 export const geofenceBodySchema = z.object({
-  latitude: z.number(),
-  longitude: z.number(),
+  latitude: latitudeSchema,
+  longitude: longitudeSchema,
 });
 
 const mediaSchema = z.object({
@@ -12,11 +25,21 @@ const mediaSchema = z.object({
 });
 
 export const createOccurrenceBodySchema = z.object({
-  title: z.string().trim().min(3).max(200),
-  description: z.string().trim().min(3).max(500),
-  latitude: z.number(),
-  longitude: z.number(),
-  categoryId: z.string().uuid(),
+  title: z
+    .string({ required_error: "Informe um título." })
+    .trim()
+    .min(3, "O título precisa ter pelo menos 3 caracteres.")
+    .max(200, "O título pode ter no máximo 200 caracteres."),
+  description: z
+    .string({ required_error: "Descreva a ocorrência." })
+    .trim()
+    .min(3, "A descrição precisa ter pelo menos 3 caracteres.")
+    .max(500, "A descrição pode ter no máximo 500 caracteres."),
+  latitude: latitudeSchema,
+  longitude: longitudeSchema,
+  categoryId: z
+    .string({ required_error: "Escolha uma categoria." })
+    .uuid("Categoria inválida."),
   media: z.array(mediaSchema).min(1, "A ocorrência precisa de pelo menos uma foto."),
 });
 

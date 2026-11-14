@@ -74,10 +74,17 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   }
 
   if (!response.ok) {
-    const message =
+    const baseMessage =
       typeof data === "object" && data && "message" in data && typeof data.message === "string"
         ? data.message
         : "Não foi possível concluir a solicitação.";
+    // Erros de validação (Zod) trazem o detalhe em `issues`; mostra o primeiro ao usuário.
+    const firstIssue =
+      typeof data === "object" && data && "issues" in data && Array.isArray(data.issues)
+        ? (data.issues[0] as { message?: unknown } | undefined)?.message
+        : undefined;
+    const message =
+      typeof firstIssue === "string" && firstIssue ? `${baseMessage} ${firstIssue}` : baseMessage;
     throw new ApiError(response.status, message);
   }
 

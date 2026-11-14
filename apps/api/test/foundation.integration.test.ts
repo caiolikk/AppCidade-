@@ -129,7 +129,7 @@ describe("fundação Cidade+", () => {
 
     const categories = await request("GET", "/categories");
     const list = categories.body as unknown as Array<{ id: string; name: string }>;
-    const buraco = list.find((item) => item.name === "Buraco");
+    const buraco = list.find((item) => item.name === "Infraestrutura");
     expect(buraco).toBeTruthy();
 
     const noPhoto = await request("POST", "/occurrences", {
@@ -194,6 +194,125 @@ describe("fundação Cidade+", () => {
       body: { type: "PERSISTE" },
     });
     expect(secondVote.status).toBe(409);
+  });
+
+  it("cria ocorrência em qualquer local (regra de bairro desativada, D-018) e a recupera", async () => {
+    const cpf = uniqueCpf();
+    const register = await request("POST", "/auth/register", {
+      body: {
+        name: "Cidadão Qualquer Local",
+        email: `qualquer-${cpf}@cidade.plus`,
+        password: "senha1234",
+        cpf,
+        cep: "11030000", // Ponta da Praia
+      },
+    });
+    expect(register.status).toBe(200);
+    const user = register.body.user as { id: string };
+    createdUserIds.push(user.id);
+    const token = String(register.body.accessToken);
+
+    const categories = await request("GET", "/categories");
+    const categoryId = (categories.body as unknown as Array<{ id: string }>)[0]!.id;
+
+    async function uploadPhoto() {
+      const file = multipartPng();
+      const upload = await request("POST", "/uploads/image", {
+        token,
+        payload: file.payload,
+        headers: file.headers,
+      });
+      expect(upload.status).toBe(200);
+      return {
+        url: String(upload.body.url),
+        thumbnailUrl: String(upload.body.thumbnailUrl),
+        publicId: String(upload.body.publicId),
+      };
+    }
+
+    async function create(latitude: unknown, longitude: unknown, overrides: Record<string, unknown> = {}) {
+      return request("POST", "/occurrences", {
+        token,
+        body: {
+          title: "Ocorrência em qualquer local",
+          description: "Criada pelo teste de localização livre.",
+          latitude,
+          longitude,
+          categoryId,
+          media: [await uploadPhoto()],
+          ...overrides,
+        },
+      });
+    }
+
+    const points = {
+      proprioBairro: { latitude: -23.989, longitude: -46.3075 }, // Ponta da Praia
+      outroBairro: { latitude: -23.967, longitude: -46.335 }, // Gonzaga
+      foraDeSantos: { latitude: -23.561414, longitude: -46.655881 }, // São Paulo
+    };
+
+    const createdIds: string[] = [];
+    for (const point of Object.values(points)) {
+      const created = await create(point.latitude, point.longitude);
+      expect(created.status).toBe(200);
+      expect(created.body.latitude).toBe(point.latitude);
+      expect(created.body.longitude).toBe(point.longitude);
+      createdIds.push(String(created.body.id));
+
+      const stored = await prisma.occurrence.findUnique({ where: { id: String(created.body.id) } });
+      expect(stored).not.toBeNull();
+      expect(stored!.userId).toBe(user.id);
+      expect(Number(stored!.latitude)).toBe(point.latitude);
+      expect(Number(stored!.longitude)).toBe(point.longitude);
+    }
+
+    const latitudeInvalida = await create(95, -46.3);
+    expect(latitudeInvalida.status).toBe(400);
+    expect(JSON.stringify(latitudeInvalida.body.issues)).toMatch(/Latitude/);
+
+    const longitudeInvalida = await create(-23.9, -200);
+    expect(longitudeInvalida.status).toBe(400);
+    expect(JSON.stringify(longitudeInvalida.body.issues)).toMatch(/Longitude/);
+
+    const coordenadaTexto = await create("-23.9", "-46.3");
+    expect(coordenadaTexto.status).toBe(400);
+
+    const semTitulo = await create(-23.989, -46.3075, { title: "" });
+    expect(semTitulo.status).toBe(400);
+
+    const semCategoria = await create(-23.989, -46.3075, { categoryId: undefined });
+    expect(semCategoria.status).toBe(400);
+
+    const semToken = await request("POST", "/occurrences", {
+      body: {
+        title: "Sem token",
+        description: "Não deve ser criada.",
+        latitude: -23.989,
+        longitude: -46.3075,
+        categoryId,
+        media: [{ url: "https://example.com/a.jpg", thumbnailUrl: "https://example.com/a.jpg", publicId: "x-123" }],
+      },
+    });
+    expect(semToken.status).toBe(401);
+
+    // Leitura usada pelo mapa/feed: cada ocorrência aparece uma única vez, com as coordenadas persistidas.
+    const list = await request("GET", "/occurrences");
+    const items = list.body as unknown as Array<{ id: string; latitude: number; longitude: number }>;
+    Object.values(points).forEach((point, index) => {
+      const matches = items.filter((item) => item.id === createdIds[index]);
+      expect(matches).toHaveLength(1);
+      expect(matches[0]!.latitude).toBe(point.latitude);
+      expect(matches[0]!.longitude).toBe(point.longitude);
+    });
+
+    const detail = await request("GET", `/occurrences/${createdIds[2]}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.latitude).toBe(points.foraDeSantos.latitude);
+    expect(detail.body.longitude).toBe(points.foraDeSantos.longitude);
+    expect(detail.body.author).toBeUndefined();
+
+    // Só as 3 válidas foram persistidas para este usuário.
+    expect(await prisma.occurrence.count({ where: { userId: user.id } })).toBe(3);
   });
 
   it("protege upload e rotas de gestor", async () => {

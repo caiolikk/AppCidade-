@@ -5,9 +5,12 @@ type FilterChipsProps = {
   filters: string[];
   selected: string;
   onSelect: (filter: string) => void;
+  /** Margem lateral do conteúdo (Figma: 26). */
+  inset?: number;
 };
 
-export function FilterChips({ filters, selected, onSelect }: FilterChipsProps) {
+/** Figma: "Menu Categorias" — pílulas de 22px; ativa preta, inativas com contorno preto. */
+export function FilterChips({ filters, selected, onSelect, inset = 26 }: FilterChipsProps) {
   return (
     <FlatList
       horizontal
@@ -18,14 +21,20 @@ export function FilterChips({ filters, selected, onSelect }: FilterChipsProps) {
       directionalLockEnabled
       decelerationRate="fast"
       style={styles.list}
-      contentContainerStyle={styles.row}
+      contentContainerStyle={[styles.row, { paddingLeft: inset, paddingRight: inset }]}
       renderItem={({ item }) => {
         const active = item === selected;
         return (
           <Pressable
             onPress={() => onSelect(item)}
-            android_ripple={{ color: "#D6DEEA", foreground: true }}
-            style={[styles.chip, active ? styles.chipActive : styles.chipIdle]}
+            hitSlop={{ top: 11, bottom: 11 }}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            style={({ pressed }) => [
+              styles.chip,
+              active ? styles.chipActive : styles.chipIdle,
+              pressed && styles.pressed,
+            ]}
           >
             <Text style={[styles.label, active && styles.labelActive]}>{item}</Text>
           </Pressable>
@@ -42,31 +51,34 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web" ? { overflow: "scroll" as const } : null),
   },
   row: {
-    paddingLeft: 16,
-    paddingRight: 28,
     alignItems: "center",
+    gap: 5,
   },
   chip: {
-    borderRadius: 999,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    marginRight: 10,
-    overflow: "hidden",
+    height: 22,
+    borderRadius: 50,
+    paddingHorizontal: 15,
+    alignItems: "center",
+    justifyContent: "center",
   },
   chipActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.text,
   },
   chipIdle: {
     backgroundColor: colors.background,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    borderWidth: 1,
+    borderColor: colors.chipBorder,
+  },
+  pressed: {
+    opacity: 0.7,
   },
   label: {
     color: colors.text,
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 17,
   },
   labelActive: {
-    color: "#FFFFFF",
+    color: colors.background,
   },
 });

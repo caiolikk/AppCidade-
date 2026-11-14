@@ -48,6 +48,12 @@ export async function buildApp() {
       });
     }
 
+    // Erros 4xx do próprio Fastify (JSON malformado, corpo inválido, etc.) não são erro interno.
+    const statusCode = (error as { statusCode?: number }).statusCode;
+    if (typeof statusCode === "number" && statusCode >= 400 && statusCode < 500) {
+      return reply.status(statusCode).send({ message: "Requisição inválida." });
+    }
+
     request.log.error(error);
     return reply.status(500).send({ message: "Erro interno." });
   });

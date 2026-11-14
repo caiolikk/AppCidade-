@@ -127,3 +127,19 @@ Arquivos:
 - O identificador `com.cidadeplus.app` foi escolhido sem consultar o time; pode mudar até a 1ª publicação.
 - **Commitar** `upload.routes.ts` e o `.gitignore`, senão o P-001 volta para os outros clones.
 - `npm audit` aponta vulnerabilidades em dependências transitivas; não foram tratadas (fora do escopo, e `audit fix --force` poderia quebrar o SDK).
+
+---
+
+## 2026-11-14 — Configurar a chave do Google Maps (Android)
+
+- **Decisão:** manter o Google Maps (`react-native-maps`) em vez de migrar para o Mapbox. Não exige mudança de código, o SDK mobile é gratuito e ilimitado, e o prazo é curto. Ver [[DECISIONS]] D-017.
+- **Por que o mapa funcionava antes:** o Expo Go embute a chave da própria Expo; o dev build (`com.cidadeplus.app`) precisa de uma chave própria.
+- **Etapas:**
+  - [x] Projeto Google Cloud `cidadeplus-514703` com faturamento + Maps SDK for Android (feito pelo usuário; o onboarding do Maps entrava em loop, então foi usado o caminho por Billing, Library e Credentials)
+  - [x] Variável `GOOGLE_MAPS_ANDROID_API_KEY` no EAS (development, preview, production; visibilidade sensitive)
+  - [x] A mesma variável em `apps/mobile/.env` (build local; arquivo ignorado pelo Git)
+  - [x] Conferir a injeção via `expo config --type prebuild` (OK: `googleMaps.apiKey` presente)
+  - [ ] Restringir a chave: pacote `com.cidadeplus.app` + SHA-1 (`eas credentials -p android`)
+  - [ ] Novo `npm run build:dev:android` e teste da aba Mapa
+- SHA-1 do keystore EAS (perfil development, alias `105cee13…`): `FF:D1:9D:56:70:85:CE:0D:31:01:0E:1A:C9:63:51:AA:C9:21:3E:90`. É público, não é segredo.
+- **Segurança:** a chave nunca vai para a documentação nem para o Git. Ela fica visível dentro do APK por natureza; a proteção é a restrição por pacote + SHA-1.

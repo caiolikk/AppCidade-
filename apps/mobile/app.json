@@ -44,6 +44,13 @@
           "locationWhenInUsePermission": "O Cidade+ usa sua localização para registrar a ocorrência no seu bairro."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "00fb9133-2eb5-4dd5-a49a-5d6e5a6f1a06"
+      }
+    },
+    "owner": "cidadeplus"
   }
 }

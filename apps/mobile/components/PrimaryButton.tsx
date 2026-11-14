@@ -4,34 +4,51 @@ import {
   StyleSheet,
   Text,
   type GestureResponderEvent,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
-import { colors } from "../theme";
+import { colors, softShadow } from "../theme";
 
 type PrimaryButtonProps = {
   label: string;
   onPress: (event: GestureResponderEvent) => void;
   loading?: boolean;
   disabled?: boolean;
+  /** "secondary": contorno, para ações menos importantes (ex.: Sair). */
+  variant?: "primary" | "secondary";
+  style?: StyleProp<ViewStyle>;
 };
 
+/** Figma: "Button - Entrar / Ocorrência / Cadastro" — pílula 52px verde, texto 17. */
 export function PrimaryButton({
   label,
   onPress,
   loading = false,
   disabled = false,
+  variant = "primary",
+  style,
 }: PrimaryButtonProps) {
   const idle = disabled || loading;
+  const secondary = variant === "secondary";
 
   return (
     <Pressable
       onPress={onPress}
       disabled={idle}
-      style={[styles.button, idle && styles.disabled]}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: idle, busy: loading }}
+      style={({ pressed }) => [
+        styles.button,
+        secondary ? styles.secondary : [styles.primary, softShadow],
+        disabled && !loading && (secondary ? styles.secondaryDisabled : styles.primaryDisabled),
+        pressed && styles.pressed,
+        style,
+      ]}
     >
       {loading ? (
-        <ActivityIndicator color="#FFFFFF" />
+        <ActivityIndicator color={secondary ? colors.primary : colors.onPrimary} />
       ) : (
-        <Text style={styles.label}>{label}</Text>
+        <Text style={[styles.label, secondary && styles.labelSecondary]}>{label}</Text>
       )}
     </Pressable>
   );
@@ -40,18 +57,35 @@ export function PrimaryButton({
 const styles = StyleSheet.create({
   button: {
     height: 52,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
+    borderRadius: 1000,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
+    paddingHorizontal: 20,
   },
-  disabled: {
-    opacity: 0.6,
+  primary: {
+    backgroundColor: colors.primary,
+  },
+  primaryDisabled: {
+    backgroundColor: colors.muted,
+  },
+  secondary: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  secondaryDisabled: {
+    opacity: 0.5,
+  },
+  pressed: {
+    opacity: 0.85,
   },
   label: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
+    color: colors.onPrimary,
+    fontSize: 17,
+    lineHeight: 22,
+    letterSpacing: -0.43,
+  },
+  labelSecondary: {
+    color: colors.primary,
   },
 });

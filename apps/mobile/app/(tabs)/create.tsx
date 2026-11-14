@@ -1,10 +1,10 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -16,64 +16,100 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { AuthTextField } from "../../components/AuthTextField";
+import UploadIcon from "../../assets/figma/icon-upload.svg";
+import { useTabBarSpace } from "../../components/AppTabBar";
+import { CategoryIcon } from "../../components/CategoryIcon";
+import { LocationPicker, type Coords } from "../../components/LocationPicker";
 import { PrimaryButton } from "../../components/PrimaryButton";
+import { SuccessPopup } from "../../components/SuccessPopup";
 import { useCategories } from "../../hooks/use-feed";
 import { api, apiUploadImage, ApiError } from "../../lib/api";
-import { useAuthStore } from "../../store/auth";
-import { colors } from "../../theme";
+import { colors, type } from "../../theme";
 
+type LocationSource = "gps" | "manual";
+
+/**
+ * Figma "Frame - Nova Ocorrência" (107:1468 / 158:*). Seções Categoria → Descrição → Foto,
+ * barra de etapas e botão "Enviar Ocorrência". "Título" e "Local" não existem no Figma, mas
+ * são exigidos pela API e pelo fluxo atual (D-018): entram como seções no mesmo estilo.
+ */
 export default function CreateScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const neighborhood = useAuthStore((state) => state.user?.neighborhood);
   const categoriesQuery = useCategories();
+  const tabBarSpace = useTabBarSpace();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoType, setPhotoType] = useState("image/jpeg");
-  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [coords, setCoords] = useState<Coords | null>(null);
+  const [locationSource, setLocationSource] = useState<LocationSource | null>(null);
+  const [locating, setLocating] = useState(false);
   const [geoMessage, setGeoMessage] = useState<string | null>(null);
-  const [geoAllowed, setGeoAllowed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  // Trava síncrona contra toque duplo antes de o estado `loading` re-renderizar o botão.
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     void locate();
   }, []);
 
+  // A regra "só no bairro residencial" está desativada temporariamente (D-018): qualquer ponto é aceito.
   async function locate() {
     setGeoMessage(null);
-    setGeoAllowed(false);
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (!permission.granted) {
-      setGeoMessage("Autorize a localização para registrar no seu bairro.");
+    setLocating(true);
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (!permission.granted) {
+        setGeoMessage("Localização não autorizada. Toque no mapa para escolher o local.");
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      setCoords({
+        latitude: Number(position.coords.latitude.toFixed(6)),
+        longitude: Number(position.coords.longitude.toFixed(6)),
+      });
+      setLocationSource("gps");
+    } catch {
+      setGeoMessage("Não foi possível obter o GPS. Toque no mapa para escolher o local.");
+    } finally {
+      setLocating(false);
+    }
+  }
+
+  function pickOnMap(next: Coords) {
+    setCoords(next);
+    setLocationSource("manual");
+    setGeoMessage(null);
+  }
+
+  function resetForm() {
+    setTitle("");
+    setDescription("");
+    setCategoryId(null);
+    setPhotoUri(null);
+    setPhotoType("image/jpeg");
+    setError(null);
+  }
+
+  /** Figma: uma única área "Tirar foto ou escolher da galeria" → pergunta a origem. */
+  function choosePhotoSource() {
+    if (Platform.OS === "web") {
+      void pickPhoto(false);
       return;
     }
-
-    const position = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
-    const next = {
-      latitude: Number(position.coords.latitude.toFixed(6)),
-      longitude: Number(position.coords.longitude.toFixed(6)),
-    };
-    setCoords(next);
-
-    try {
-      await api("/occurrences/geofence-check", { body: next });
-      setGeoAllowed(true);
-      setGeoMessage("Ponto dentro do seu bairro residencial.");
-    } catch (caught) {
-      setGeoAllowed(false);
-      setGeoMessage(
-        caught instanceof ApiError
-          ? caught.message
-          : "Não foi possível validar o ponto no bairro.",
-      );
-    }
+    Alert.alert("Foto da ocorrência", "De onde vem a foto?", [
+      { text: "Câmera", onPress: () => void pickPhoto(true) },
+      { text: "Galeria", onPress: () => void pickPhoto(false) },
+      { text: "Cancelar", style: "cancel" },
+    ]);
   }
 
   async function pickPhoto(fromCamera: boolean) {
@@ -111,21 +147,33 @@ export default function CreateScreen() {
   }
 
   async function handleSubmit() {
+    if (submittingRef.current) {
+      return;
+    }
     setError(null);
 
-    if (!photoUri) {
-      setError("A ocorrência precisa de pelo menos uma foto.");
-      return;
-    }
-    if (!coords) {
-      setError("Não foi possível obter sua localização.");
-      return;
-    }
     if (!categoryId) {
       setError("Escolha uma categoria.");
       return;
     }
+    if (title.trim().length < 3) {
+      setError("O título precisa ter pelo menos 3 caracteres.");
+      return;
+    }
+    if (description.trim().length < 3) {
+      setError("Descreva a ocorrência (pelo menos 3 caracteres).");
+      return;
+    }
+    if (!coords) {
+      setError("Defina o local da ocorrência (GPS ou toque no mapa).");
+      return;
+    }
+    if (!photoUri) {
+      setError("A ocorrência precisa de pelo menos uma foto.");
+      return;
+    }
 
+    submittingRef.current = true;
     setLoading(true);
     try {
       const media = await apiUploadImage({
@@ -134,10 +182,10 @@ export default function CreateScreen() {
         type: photoType,
       });
 
-      await api("/occurrences", {
+      const created = await api<{ id: string }>("/occurrences", {
         body: {
-          title,
-          description,
+          title: title.trim(),
+          description: description.trim(),
           latitude: coords.latitude,
           longitude: coords.longitude,
           categoryId,
@@ -145,16 +193,37 @@ export default function CreateScreen() {
         },
       });
 
+      // Recarrega feed e mapa a partir da API (fonte da verdade); não insere nada só no cache.
       await queryClient.invalidateQueries({ queryKey: ["occurrences"] });
-      router.replace("/");
+      resetForm();
+      setCreatedId(created.id); // abre o popup; ao fechar, vai para o mapa
     } catch (caught) {
       setError(
         caught instanceof ApiError ? caught.message : "Não foi possível registrar a ocorrência.",
       );
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }
+
+  const closeSuccess = useCallback(() => {
+    const id = createdId;
+    setCreatedId(null);
+    if (id) {
+      router.replace({ pathname: "/map", params: { focus: id, focusKey: String(Date.now()) } });
+    }
+  }, [createdId, router]);
+
+  // Barra de etapas do Figma (5 segmentos), refletindo o que já foi preenchido.
+  const steps = [
+    Boolean(categoryId),
+    title.trim().length >= 3 && description.trim().length >= 3,
+    Boolean(coords),
+    Boolean(photoUri),
+    Boolean(categoryId && coords && photoUri && title.trim().length >= 3 && description.trim().length >= 3),
+  ];
+  const ready = steps[4];
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -163,96 +232,133 @@ export default function CreateScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: tabBarSpace + 16 }]}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.title}>Nova ocorrência</Text>
-          <Text style={styles.subtitle}>
-            {neighborhood ?? "Seu bairro"} · foto obrigatória · só no seu polígono
-          </Text>
-
-          {photoUri ? (
-            <Image source={{ uri: photoUri }} style={styles.preview} />
-          ) : (
-            <View style={styles.previewEmpty}>
-              <Ionicons name="camera-outline" size={28} color={colors.muted} />
-              <Text style={styles.previewHint}>Evidência fotográfica</Text>
-            </View>
-          )}
-
-          <View style={styles.photoActions}>
-            <Pressable style={styles.photoButton} onPress={() => void pickPhoto(true)}>
-              <Text style={styles.photoButtonText}>Câmera</Text>
-            </Pressable>
-            <Pressable style={styles.photoButton} onPress={() => void pickPhoto(false)}>
-              <Text style={styles.photoButtonText}>Galeria</Text>
-            </Pressable>
+          <View style={styles.header}>
+            <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+              Nova Ocorrência
+            </Text>
           </View>
 
-          <Text style={styles.geo}>
-            {coords
-              ? `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`
-              : "Obtendo localização…"}
-          </Text>
-          {geoMessage ? (
-            <Text style={[styles.geoStatus, geoAllowed ? styles.geoOk : styles.geoBad]}>
-              {geoMessage}
-            </Text>
-          ) : null}
-          <Pressable onPress={() => void locate()}>
-            <Text style={styles.retry}>Atualizar localização</Text>
-          </Pressable>
+          <View style={styles.steps} accessibilityLabel="Etapas da ocorrência">
+            {steps.map((done, index) => (
+              <View key={index} style={[styles.step, done && styles.stepDone]} />
+            ))}
+          </View>
 
-          <AuthTextField
-            label="Título"
+          <Text style={styles.sectionLabel}>Categoria</Text>
+          <View style={styles.categories}>
+            {(categoriesQuery.data ?? []).map((item, index) => (
+              // Figma: 3 por linha — esquerda, centro e direita.
+              <View
+                key={item.id}
+                style={[
+                  styles.categoryCell,
+                  { alignItems: (["flex-start", "center", "flex-end"] as const)[index % 3] },
+                ]}
+              >
+                <CategoryIcon
+                  name={item.name}
+                  selected={item.id === categoryId}
+                  dimmed={categoryId !== null && item.id !== categoryId}
+                  onPress={() => setCategoryId(item.id)}
+                />
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.divider} />
+
+          <Text style={styles.sectionLabel}>Título</Text>
+          <TextInput
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(value) => setTitle(value.slice(0, 200))}
             placeholder="Ex.: Buraco na calçada"
-            autoCapitalize="sentences"
+            placeholderTextColor={colors.muted}
+            style={[styles.box, styles.titleInput]}
+            accessibilityLabel="Título"
           />
 
-          <Text style={styles.label}>Descrição</Text>
+          <Text style={[styles.sectionLabel, styles.sectionSpacing]}>Descrição</Text>
           <TextInput
             value={description}
             onChangeText={(value) => setDescription(value.slice(0, 500))}
-            placeholder="Descreva o problema"
-            placeholderTextColor={colors.subtitle}
+            placeholder="Digite a descrição"
+            placeholderTextColor={colors.muted}
             multiline
-            style={styles.textarea}
+            style={[styles.box, styles.textarea]}
+            accessibilityLabel="Descrição"
           />
           <Text style={styles.counter}>{description.length}/500</Text>
 
-          <Text style={styles.label}>Categoria</Text>
-          <View style={styles.categories}>
-            {(categoriesQuery.data ?? []).map((item) => {
-              const active = item.id === categoryId;
-              return (
-                <Pressable
-                  key={item.id}
-                  onPress={() => setCategoryId(item.id)}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {item.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
+          <View style={styles.divider} />
+
+          <Text style={styles.sectionLabel}>Local</Text>
+          <View style={styles.picker}>
+            <LocationPicker value={coords} onChange={pickOnMap} />
           </View>
+          <Text style={styles.geo}>
+            {coords
+              ? `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)} · ${
+                  locationSource === "manual" ? "escolhido no mapa" : "GPS"
+                }`
+              : locating
+                ? "Obtendo localização…"
+                : "Local ainda não definido."}
+          </Text>
+          {geoMessage ? <Text style={styles.geoError}>{geoMessage}</Text> : null}
+          <Pressable onPress={() => void locate()} disabled={locating} hitSlop={8}>
+            <Text style={styles.retry}>{locating ? "Localizando…" : "Usar minha localização (GPS)"}</Text>
+          </Pressable>
+
+          <View style={styles.divider} />
+
+          <Text style={styles.sectionLabel}>Foto</Text>
+          <Pressable
+            onPress={choosePhotoSource}
+            accessibilityRole="button"
+            accessibilityLabel="Tirar foto ou escolher da galeria"
+            style={({ pressed }) => [styles.box, styles.photoBox, pressed && styles.pressed]}
+          >
+            {photoUri ? (
+              <>
+                <Image source={{ uri: photoUri }} style={styles.preview} />
+                <Text style={styles.photoHint}>Toque para trocar a foto</Text>
+              </>
+            ) : (
+              <View style={styles.photoEmpty}>
+                <UploadIcon width={34} height={34} />
+                <Text style={styles.photoText}>Tirar foto ou escolher da galeria</Text>
+              </View>
+            )}
+          </Pressable>
+
+          <View style={styles.divider} />
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <PrimaryButton
-            label="Registrar"
+            label="Enviar Ocorrência"
             onPress={() => void handleSubmit()}
             loading={loading}
-            disabled={!photoUri || !coords || !categoryId}
+            disabled={!ready}
+            style={styles.submit}
           />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <SuccessPopup
+        visible={createdId !== null}
+        title="Ocorrência Enviada!"
+        message="Cheque o painel de ocorrências e fique atento às notificações para atualizações."
+        onClose={closeSuccess}
+      />
     </SafeAreaView>
   );
 }
+
+const SIDE = 26;
 
 const styles = StyleSheet.create({
   safe: {
@@ -263,132 +369,144 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 40,
+    paddingTop: 36,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: SIDE,
   },
   title: {
-    color: colors.text,
-    fontSize: 28,
-    fontWeight: "800",
-  },
-  subtitle: {
-    color: colors.muted,
-    fontSize: 14,
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  preview: {
-    width: "100%",
-    height: 180,
-    borderRadius: 16,
-    backgroundColor: colors.grid,
-    marginBottom: 12,
-  },
-  previewEmpty: {
-    height: 140,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: colors.chipBorder,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-    gap: 8,
-  },
-  previewHint: {
-    color: colors.muted,
-    fontSize: 14,
-  },
-  photoActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 14,
-  },
-  photoButton: {
+    ...type.largeTitle,
     flex: 1,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
+    minWidth: 0,
+    marginRight: 12,
   },
-  photoButtonText: {
+  steps: {
+    flexDirection: "row",
+    gap: 8,
+    marginHorizontal: SIDE,
+    marginTop: 5,
+    marginBottom: 24,
+  },
+  step: {
+    flex: 1,
+    height: 4,
+    borderRadius: 5,
+    backgroundColor: colors.progressIdle,
+  },
+  stepDone: {
+    backgroundColor: colors.primary,
+  },
+  sectionLabel: {
+    ...type.section,
+    marginHorizontal: SIDE,
+    marginBottom: 10,
+  },
+  sectionSpacing: {
+    marginTop: 18,
+  },
+  categories: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 18,
+    marginHorizontal: SIDE,
+  },
+  categoryCell: {
+    width: "33.333%",
+  },
+  picker: {
+    marginHorizontal: SIDE,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.divider,
+    marginHorizontal: 11,
+    marginVertical: 18,
+  },
+  box: {
+    marginHorizontal: SIDE,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 5,
+    backgroundColor: colors.background,
     color: colors.text,
-    fontWeight: "700",
+    fontSize: 14,
+  },
+  titleInput: {
+    height: 44,
+    paddingHorizontal: 15,
+  },
+  textarea: {
+    minHeight: 110,
+    paddingHorizontal: 15,
+    paddingTop: 12,
+    paddingBottom: 12,
+    textAlignVertical: "top",
+  },
+  counter: {
+    ...type.caption,
+    textAlign: "right",
+    marginHorizontal: SIDE,
+    marginTop: 4,
   },
   geo: {
     color: colors.text,
     fontSize: 13,
     fontWeight: "600",
+    marginTop: 8,
+    marginHorizontal: SIDE,
   },
-  geoStatus: {
-    marginTop: 4,
+  geoError: {
+    color: colors.error,
     fontSize: 13,
-  },
-  geoOk: {
-    color: "#15803D",
-  },
-  geoBad: {
-    color: "#B91C1C",
+    marginTop: 4,
+    marginHorizontal: SIDE,
   },
   retry: {
     color: colors.primary,
     fontWeight: "700",
     marginTop: 6,
-    marginBottom: 16,
+    marginHorizontal: SIDE,
   },
-  label: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: "700",
-    marginBottom: 6,
+  photoBox: {
+    minHeight: 90,
+    justifyContent: "center",
+    overflow: "hidden",
   },
-  textarea: {
-    minHeight: 96,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: colors.text,
-    fontSize: 16,
-    textAlignVertical: "top",
-  },
-  counter: {
-    color: colors.muted,
-    fontSize: 12,
-    textAlign: "right",
-    marginTop: 4,
-    marginBottom: 14,
-  },
-  categories: {
+  photoEmpty: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 13,
+    paddingHorizontal: 16,
+    paddingVertical: 28,
   },
-  chip: {
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  photoText: {
+    color: colors.muted,
+    fontSize: 14,
+    flexShrink: 1,
   },
-  chipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  preview: {
+    width: "100%",
+    height: 180,
   },
-  chipText: {
-    color: colors.text,
-    fontWeight: "600",
+  photoHint: {
+    ...type.caption,
+    textAlign: "center",
+    paddingVertical: 6,
   },
-  chipTextActive: {
-    color: "#FFFFFF",
+  pressed: {
+    opacity: 0.8,
   },
   error: {
-    color: "#B91C1C",
+    color: colors.error,
     fontSize: 14,
-    marginBottom: 8,
+    marginHorizontal: SIDE,
+    marginBottom: 10,
+  },
+  submit: {
+    marginHorizontal: 34,
   },
 });

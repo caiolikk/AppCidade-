@@ -10,13 +10,15 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Logo from "../../assets/figma/logo-horizontal.svg";
 import { AuthTextField } from "../../components/AuthTextField";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { api, ApiError } from "../../lib/api";
 import type { AuthResponse } from "../../lib/types";
 import { useAuthStore } from "../../store/auth";
-import { colors } from "../../theme";
+import { colors, type } from "../../theme";
 
+/** Figma: "Frame - Login" (263:2122) — logo, boas-vindas, 2 campos, botão e link de cadastro. */
 export default function LoginScreen() {
   const applySession = useAuthStore((state) => state.applySession);
   const [email, setEmail] = useState("");
@@ -50,44 +52,53 @@ export default function LoginScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.kicker}>Santos/SP</Text>
-          <Text style={styles.title}>Cidade+</Text>
-          <Text style={styles.subtitle}>
-            Entre para acompanhar e registrar ocorrências do seu bairro.
-          </Text>
+          <View style={styles.logo}>
+            <Logo width={200} height={52} accessibilityLabel="Cidade+" />
+          </View>
+          <Text style={styles.title}>Seja bem-vindo(a)!</Text>
+          <Text style={styles.subtitle}>Faça seu login</Text>
 
-          <AuthTextField
-            label="E-mail"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="voce@email.com"
-            keyboardType="email-address"
-            autoComplete="email"
-          />
-          <AuthTextField
-            label="Senha"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Mínimo 8 caracteres"
-            secureTextEntry
-            autoComplete="password"
-          />
+          <View style={styles.form}>
+            <AuthTextField
+              value={email}
+              onChangeText={setEmail}
+              placeholder="E-mail"
+              keyboardType="email-address"
+              autoComplete="email"
+              invalid={Boolean(error)}
+            />
+            <AuthTextField
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Senha"
+              secureTextEntry
+              autoComplete="password"
+              invalid={Boolean(error)}
+            />
+          </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <PrimaryButton label="Entrar" onPress={() => void handleSubmit()} loading={loading} />
+          <PrimaryButton
+            label="Entrar"
+            onPress={() => void handleSubmit()}
+            loading={loading}
+            style={styles.button}
+          />
 
           <Link href="/(auth)/register" asChild>
-            <Pressable style={styles.linkWrap}>
-              <Text style={styles.link}>Criar conta de cidadão</Text>
+            <Pressable style={styles.linkWrap} hitSlop={8}>
+              <Text style={styles.linkText}>
+                Não possui uma conta? <Text style={styles.link}>Criar nova conta</Text>
+              </Text>
             </Pressable>
           </Link>
 
-          <View style={styles.hintBox}>
-            <Text style={styles.hintTitle}>Acesso de staff (seed)</Text>
-            <Text style={styles.hint}>admin@cidade.plus / admin1234</Text>
-            <Text style={styles.hint}>gestor@cidade.plus / gestor1234</Text>
-          </View>
+          {__DEV__ ? (
+            <View style={styles.devHint}>
+              <Text style={styles.devHintText}>Dev (seed): admin@cidade.plus / admin1234</Text>
+            </View>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -103,56 +114,58 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 40,
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 26,
+    paddingVertical: 32,
   },
-  kicker: {
-    color: colors.muted,
-    fontSize: 14,
-    fontWeight: "600",
+  logo: {
+    alignItems: "center",
+    marginBottom: 34,
   },
   title: {
-    color: colors.text,
-    fontSize: 36,
-    fontWeight: "800",
-    letterSpacing: -0.8,
-    marginTop: 4,
+    ...type.largeTitle,
+    textAlign: "center",
   },
   subtitle: {
     color: colors.muted,
-    fontSize: 16,
-    lineHeight: 22,
-    marginTop: 8,
-    marginBottom: 28,
+    fontSize: 20,
+    fontWeight: "500",
+    letterSpacing: 0.4,
+    textAlign: "center",
+    marginTop: -2,
+  },
+  form: {
+    marginTop: 18,
   },
   error: {
-    color: "#B91C1C",
+    color: colors.error,
     fontSize: 14,
-    marginBottom: 8,
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  button: {
+    marginHorizontal: 8,
   },
   linkWrap: {
-    alignItems: "center",
-    paddingVertical: 18,
+    marginTop: 40,
+    alignSelf: "center",
+  },
+  linkText: {
+    ...type.small,
+    textAlign: "center",
   },
   link: {
     color: colors.primary,
-    fontSize: 15,
     fontWeight: "700",
+    textDecorationLine: "underline",
   },
-  hintBox: {
-    marginTop: 8,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: "#F3F4F6",
+  devHint: {
+    marginTop: 28,
+    alignItems: "center",
   },
-  hintTitle: {
-    color: colors.text,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  hint: {
+  devHintText: {
+    ...type.caption,
     color: colors.muted,
-    fontSize: 13,
   },
 });

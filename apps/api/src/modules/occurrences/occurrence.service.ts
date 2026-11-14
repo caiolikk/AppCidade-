@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { env } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
 import { HttpError } from "../../utils/http-error.js";
 import { assertPointInUserNeighborhood } from "../geo/geofencing.js";
@@ -41,11 +42,14 @@ export async function createOccurrence(
     throw new HttpError(400, "Categoria inexistente.");
   }
 
-  await assertPointInUserNeighborhood({
-    userId,
-    latitude: input.latitude,
-    longitude: input.longitude,
-  });
+  // Regra de bairro desativada temporariamente (D-018). A estrutura continua disponível.
+  if (env.OCCURRENCE_GEOFENCE_ENABLED) {
+    await assertPointInUserNeighborhood({
+      userId,
+      latitude: input.latitude,
+      longitude: input.longitude,
+    });
+  }
 
   const occurrence = await prisma.$transaction(async (tx) => {
     const created = await tx.occurrence.create({

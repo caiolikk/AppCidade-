@@ -15,20 +15,31 @@ import { api, ApiError } from "../../lib/api";
 import { formatCep, formatCpf, onlyDigits } from "../../lib/format";
 import type { AuthResponse } from "../../lib/types";
 import { useAuthStore } from "../../store/auth";
-import { colors } from "../../theme";
+import { colors, type } from "../../theme";
 
+/**
+ * Figma: "Frame - Cadastro" (87:1327). Diferenças intencionais: o Figma tem "Celular", que a
+ * API não aceita (omitido), e não tem "CEP", que a API exige para resolver o bairro (mantido).
+ */
 export default function RegisterScreen() {
   const applySession = useAuthStore((state) => state.applySession);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [cpf, setCpf] = useState("");
   const [cep, setCep] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const passwordMismatch = passwordConfirm.length > 0 && passwordConfirm !== password;
+
   async function handleSubmit() {
     setError(null);
+    if (password !== passwordConfirm) {
+      setError("As senhas não conferem.");
+      return;
+    }
     setLoading(true);
     try {
       const session = await api<AuthResponse>("/auth/register", {
@@ -61,26 +72,46 @@ export default function RegisterScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.title}>Criar conta</Text>
+          <Text style={styles.title}>Cadastro</Text>
           <Text style={styles.subtitle}>
-            O bairro vem do CEP. O Cidade+ atende apenas Santos/SP.
+            Vamos realizar seu cadastro, precisamos apenas de algumas informações:
           </Text>
 
+          <Text style={styles.section}>Informações pessoais</Text>
+
           <AuthTextField
-            label="Nome"
+            label="Nome Completo"
             value={name}
             onChangeText={setName}
-            placeholder="Seu nome"
+            placeholder="Nome Completo"
             autoCapitalize="words"
             autoComplete="name"
+            placeholderTone="muted"
           />
           <AuthTextField
             label="E-mail"
             value={email}
             onChangeText={setEmail}
-            placeholder="voce@email.com"
+            placeholder="meuemail@exemplo.com"
+            placeholderTone="muted"
             keyboardType="email-address"
             autoComplete="email"
+          />
+          <AuthTextField
+            label="CPF"
+            value={cpf}
+            onChangeText={(value) => setCpf(formatCpf(value))}
+            placeholder="000.000.000-00"
+            placeholderTone="muted"
+            keyboardType="number-pad"
+          />
+          <AuthTextField
+            label="CEP residencial (Santos/SP)"
+            value={cep}
+            onChangeText={(value) => setCep(formatCep(value))}
+            placeholder="11030-000"
+            placeholderTone="muted"
+            keyboardType="number-pad"
           />
           <AuthTextField
             label="Senha"
@@ -88,36 +119,34 @@ export default function RegisterScreen() {
             onChangeText={setPassword}
             placeholder="Mínimo 8 caracteres"
             secureTextEntry
-            autoComplete="password"
+            autoComplete="new-password"
           />
           <AuthTextField
-            label="CPF"
-            value={cpf}
-            onChangeText={(value) => setCpf(formatCpf(value))}
-            placeholder="000.000.000-00"
-            keyboardType="number-pad"
-          />
-          <AuthTextField
-            label="CEP residencial"
-            value={cep}
-            onChangeText={(value) => setCep(formatCep(value))}
-            placeholder="11030-000"
-            keyboardType="number-pad"
+            label="Repetir Senha"
+            value={passwordConfirm}
+            onChangeText={setPasswordConfirm}
+            placeholder="Repita a senha"
+            secureTextEntry
+            autoComplete="new-password"
+            invalid={passwordMismatch}
           />
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <PrimaryButton
-            label="Cadastrar"
-            onPress={() => void handleSubmit()}
-            loading={loading}
-          />
-
           <Link href="/(auth)/login" asChild>
-            <Pressable style={styles.linkWrap}>
-              <Text style={styles.link}>Já tenho conta</Text>
+            <Pressable style={styles.linkWrap} hitSlop={8}>
+              <Text style={styles.linkText}>
+                Já possuo uma conta. <Text style={styles.link}>Entrar agora.</Text>
+              </Text>
             </Pressable>
           </Link>
+
+          <PrimaryButton
+            label="Finalizar Cadastro"
+            onPress={() => void handleSubmit()}
+            loading={loading}
+            style={styles.button}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -133,35 +162,46 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 40,
+    paddingHorizontal: 26,
+    paddingTop: 40,
+    paddingBottom: 32,
   },
   title: {
-    color: colors.text,
-    fontSize: 32,
-    fontWeight: "800",
-    letterSpacing: -0.6,
+    ...type.largeTitle,
   },
   subtitle: {
     color: colors.muted,
-    fontSize: 16,
+    fontSize: 14,
+    lineHeight: 17,
+    fontWeight: "500",
+    marginTop: 2,
+    marginBottom: 16,
+    maxWidth: 300,
+  },
+  section: {
+    ...type.section,
+    fontSize: 18,
     lineHeight: 22,
-    marginTop: 8,
-    marginBottom: 24,
+    marginBottom: 10,
   },
   error: {
-    color: "#B91C1C",
+    color: colors.error,
     fontSize: 14,
     marginBottom: 8,
   },
   linkWrap: {
-    alignItems: "center",
-    paddingVertical: 18,
+    alignSelf: "center",
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  linkText: {
+    ...type.small,
+    textAlign: "center",
   },
   link: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: "700",
+    textDecorationLine: "underline",
+  },
+  button: {
+    marginHorizontal: 8,
   },
 });

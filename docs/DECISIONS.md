@@ -81,3 +81,28 @@ A fonte da verdade nativa é `app.json` + `app.config.js`. Se essas pastas forem
 ## D-016 — `expo-font` fixado em `~14.0.12` (overrides na raiz + dependência do mobile)
 **Data:** 2026-11-13 · **Status:** Vigente
 O `@expo/vector-icons` declara o peer `expo-font >=14.0.4`, e o npm instalou a 57.x (de outro SDK), criando um módulo nativo duplicado. Ao atualizar o SDK, atualize também esse override. Ver [[PROBLEMS]] P-006.
+
+## D-017 — Manter o Google Maps (`react-native-maps`); não migrar para o Mapbox
+**Data:** 2026-11-14 · **Status:** Vigente
+Não exige mudança de código (o `MapCanvas.tsx` tem ~30 linhas), o Maps SDK mobile tem uso gratuito ilimitado e o iOS usa Apple Maps sem chave. O Mapbox exigiria reescrever o componente, adicionar uma dependência nativa e usar token também no iOS, além de ter limite gratuito de 25 mil MAU, o que não vale a pena perto da entrega (26/nov). Reavaliar só se surgir a necessidade de estilo próprio ou de mapa offline. A chave fica em `GOOGLE_MAPS_ANDROID_API_KEY` (EAS env + `apps/mobile/.env`), injetada pelo `app.config.js`; projeto Google Cloud `cidadeplus-514703`.
+Origem: [[ambiente-e-builds]].
+
+## D-018 — Regra de bairro na criação de ocorrências desativada temporariamente (flag)
+**Data:** 2026-11-14 · **Status:** Vigente (temporária) · **Suspende** D-008 apenas na criação de ocorrências
+A pedido do usuário, qualquer pessoa autenticada pode criar ocorrências em qualquer local. A regra fica atrás de `OCCURRENCE_GEOFENCE_ENABLED` (padrão `false`, em `apps/api/src/config/env.ts`); para reativar, basta `true` no `.env`. A estrutura de bairros, o `geofencing.ts` e o endpoint `geofence-check` foram mantidos. O app deixou de chamar o `geofence-check` (a regra não fica ativa só de um lado). A validação de faixa das coordenadas, que antes só existia dentro do geofence, foi para o schema Zod e vale sempre. Não foi criada relação ocorrência→bairro (exigiria migration). Junto com isso, o seed deixou de criar ocorrências fictícias e passou a removê-las.
+Origem: [[ocorrencias-criacao-e-mapa]].
+
+## D-019 — 5 categorias do Figma (Infraestrutura, Limpeza, Segurança, Trânsito, Outros)
+**Data:** 2026-11-14 · **Status:** Vigente · aprovada pelo usuário
+Substituem as 7 do seed antigo (Buraco, Calçada, Iluminação, Sinalização, Lixo, Árvore, Outros), porque o Figma usa essas 5 com ilustrações 3D (`apps/mobile/assets/figma/category-*.png`). O seed cria as 5 e apaga as antigas **somente se não tiverem ocorrências**. A API continua ordenando por nome; a ordem do Figma é aplicada no app (`hooks/use-feed.ts`). Nenhuma mudança de schema.
+Origem: [[interface-figma]].
+
+## D-020 — Módulos nativos de UI: react-native-svg, expo-linear-gradient, expo-blur
+**Data:** 2026-11-14 · **Status:** Vigente · aprovada pelo usuário
+Necessários para reproduzir o Figma (ícones SVG, degradê de fundo, navbar de vidro). Versões do SDK 54 via `expo install`. SVGs importados como componentes com `react-native-svg-transformer` (`metro.config.js`, `svg.d.ts`). **Exigem um development build novo**: um build antigo quebra ao carregar o JS atual.
+Origem: [[interface-figma]].
+
+## D-021 — Home "perto de mim" (5 km, no app) e direção pela bússola
+**Data:** 2026-11-14 · **Status:** Vigente
+A Home mostra só ocorrências a até `NEARBY_RADIUS_KM = 5` (`apps/mobile/lib/geo.ts`), ordenadas por distância (haversine **no app**, sobre o mesmo `GET /occurrences`); o **mapa mostra todas**. Critério: distância geográfica, nunca bairro. Sem localização, a Home mostra todas por data, com aviso. A direção do usuário vem do **heading da bússola** (`watchHeadingAsync`); sem leitura confiável, usa o course do GPS só acima de 1 m/s; senão, não mostra direção. Só permissão de localização em primeiro plano. O modal de detalhes é único (Home, mapa e rota). Evolução prevista: filtro no servidor com PostGIS quando o volume crescer.
+Origem: [[ocorrencias-criacao-e-mapa]].

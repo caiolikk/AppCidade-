@@ -84,15 +84,8 @@ async function main() {
     wkt: PONTA_DA_PRAIA_WKT,
   });
 
-  const categories = [
-    "Buraco",
-    "Calçada",
-    "Iluminação",
-    "Sinalização",
-    "Lixo",
-    "Árvore",
-    "Outros",
-  ];
+  // D-019: as 5 categorias do Figma (cada uma tem ilustração no app).
+  const categories = ["Infraestrutura", "Limpeza", "Segurança", "Trânsito", "Outros"];
 
   for (const name of categories) {
     await prisma.category.upsert({
@@ -100,6 +93,22 @@ async function main() {
       update: {},
       create: { name },
     });
+  }
+
+  // Remove categorias antigas (antes da D-019) que não têm ocorrências. Nunca apaga uma
+  // categoria em uso: se houver ocorrências, ela fica e é avisada no console.
+  const obsolete = await prisma.category.findMany({
+    where: { name: { notIn: categories } },
+    select: { id: true, name: true, _count: { select: { occurrences: true } } },
+  });
+  for (const category of obsolete) {
+    if (category._count.occurrences === 0) {
+      await prisma.category.delete({ where: { id: category.id } });
+    } else {
+      console.warn(
+        `Seed: categoria antiga "${category.name}" mantida (${category._count.occurrences} ocorrência(s)).`,
+      );
+    }
   }
 
   await upsertStaff({
@@ -118,114 +127,22 @@ async function main() {
     password: process.env.SEED_MANAGER_PASSWORD ?? "gestor1234",
   });
 
-  await seedDemoOccurrences();
+  await removeDemoOccurrences();
 }
 
-async function seedDemoOccurrences() {
-  const existing = await prisma.occurrence.count();
-  if (existing > 0) {
-    return;
-  }
-
-  const admin = await prisma.user.findUnique({
-    where: { email: "admin@cidade.plus" },
+/**
+ * Remove as ocorrências fictícias que versões antigas deste seed criavam (D-018 / plano
+ * ocorrencias-criacao-e-mapa). Elas são identificadas pela mídia com publicId "seed-*",
+ * marca exclusiva do seed: uploads reais geram "local-<uuid>" ou o id do Cloudinary.
+ * Cascata do schema: apaga também mídia, avaliações e histórico de status.
+ */
+async function removeDemoOccurrences() {
+  const removed = await prisma.occurrence.deleteMany({
+    where: { media: { some: { publicId: { startsWith: "seed-" } } } },
   });
 
-  if (!admin) {
-    return;
-  }
-
-  const categories = await prisma.category.findMany();
-  const byName = Object.fromEntries(categories.map((item) => [item.name, item.id]));
-
-  const demos = [
-    {
-      title: "Buraco na calçada",
-      description: "Calçada irregular próxima à praça, dificultando a passagem.",
-      category: "Buraco",
-      latitude: -23.967,
-      longitude: -46.335,
-      status: "EM_ATENDIMENTO" as const,
-      photoId: "1015",
-    },
-    {
-      title: "Poste apagado",
-      description: "Iluminação pública fora do ar no trecho da avenida.",
-      category: "Iluminação",
-      latitude: -23.968,
-      longitude: -46.333,
-      status: "RECEBIDA" as const,
-      photoId: "1016",
-    },
-    {
-      title: "Calçada irregular",
-      description: "Desnível na calçada com risco de queda.",
-      category: "Calçada",
-      latitude: -23.966,
-      longitude: -46.337,
-      status: "EM_ANALISE" as const,
-      photoId: "1018",
-    },
-    {
-      title: "Sinalização apagada",
-      description: "Faixa e placas pouco visíveis no cruzamento.",
-      category: "Sinalização",
-      latitude: -23.965,
-      longitude: -46.334,
-      status: "REPORTADA" as const,
-      photoId: "1019",
-    },
-    {
-      title: "Acúmulo de lixo",
-      description: "Resíduos acumulados na esquina há alguns dias.",
-      category: "Lixo",
-      latitude: -23.969,
-      longitude: -46.336,
-      status: "RESOLVIDA" as const,
-      photoId: "1020",
-    },
-    {
-      title: "Árvore com galho caído",
-      description: "Galho obstruindo parte da calçada após chuva.",
-      category: "Árvore",
-      latitude: -23.964,
-      longitude: -46.332,
-      status: "REPORTADA" as const,
-      photoId: "1022",
-    },
-  ];
-
-  for (const demo of demos) {
-    const categoryId = byName[demo.category];
-    if (!categoryId) {
-      continue;
-    }
-
-    await prisma.occurrence.create({
-      data: {
-        title: demo.title,
-        description: demo.description,
-        latitude: demo.latitude,
-        longitude: demo.longitude,
-        status: demo.status,
-        categoryId,
-        userId: admin.id,
-        media: {
-          create: {
-            url: `https://picsum.photos/id/${demo.photoId}/800/600`,
-            thumbnailUrl: `https://picsum.photos/id/${demo.photoId}/200/200`,
-            publicId: `seed-${demo.photoId}`,
-          },
-        },
-        statusHistory: {
-          create: {
-            previousStatus: null,
-            newStatus: demo.status,
-            changedById: admin.id,
-          },
-        },
-      },
-    });
+  if (removed.count > 0) {
+    console.log(`Seed: ${removed.count} ocorrência(s) fictícia(s) removida(s).`);
   }
 }
 

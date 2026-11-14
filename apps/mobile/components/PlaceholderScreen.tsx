@@ -1,31 +1,37 @@
 import { StyleSheet, Text, View } from "react-native";
-import { colors } from "../theme";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { colors, type } from "../theme";
 
-export function PlaceholderScreen({ title }: { title: string }) {
+/**
+ * Cabeçalho no padrão do Figma (Large Title à esquerda) para telas cuja funcionalidade
+ * ainda não existe (ex.: Notificações). Mostra um estado vazio honesto, sem dados fictícios.
+ */
+export function PlaceholderScreen({ title, message }: { title: string; message?: string }) {
   return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.text}>Em desenvolvimento</Text>
-    </View>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <View style={styles.content}>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.text}>{message ?? "Em desenvolvimento."}</Text>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  safe: {
     flex: 1,
     backgroundColor: colors.background,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
+  },
+  content: {
+    paddingTop: 36,
+    paddingHorizontal: 26,
   },
   title: {
-    color: colors.text,
-    fontSize: 22,
-    fontWeight: "800",
-    marginBottom: 8,
+    ...type.largeTitle,
   },
   text: {
     color: colors.muted,
-    fontSize: 16,
+    fontSize: 12,
+    marginTop: 12,
   },
 });

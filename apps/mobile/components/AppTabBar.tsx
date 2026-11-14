@@ -1,107 +1,128 @@
-import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { Pressable, StyleSheet, View } from "react-native";
+import { BlurView } from "expo-blur";
+import type { FC } from "react";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors } from "../theme";
+import type { SvgProps } from "react-native-svg";
+import NavHome from "../assets/figma/nav-home.svg";
+import NavMap from "../assets/figma/nav-map.svg";
+import NavNotify from "../assets/figma/nav-notify.svg";
+import NavProfile from "../assets/figma/nav-profile.svg";
+import NavReport from "../assets/figma/nav-report.svg";
 
-const ICONS: Record<
-  string,
-  { on: keyof typeof Ionicons.glyphMap; off: keyof typeof Ionicons.glyphMap }
-> = {
-  index: { on: "home", off: "home-outline" },
-  map: { on: "map", off: "map-outline" },
-  notifications: { on: "notifications", off: "notifications-outline" },
-  account: { on: "person", off: "person-outline" },
+const ICONS: Record<string, { Icon: FC<SvgProps>; label: string }> = {
+  index: { Icon: NavHome, label: "Início" },
+  map: { Icon: NavMap, label: "Mapa" },
+  create: { Icon: NavReport, label: "Nova ocorrência" },
+  notifications: { Icon: NavNotify, label: "Notificações" },
+  account: { Icon: NavProfile, label: "Minha conta" },
 };
 
+/** Ícones de 60×60 do Figma (o desenho tem ~24px; o resto é área de toque). */
+const ICON_SIZE = 60;
+const BAR_PADDING_TOP = 8;
+
+/** Espaço ocupado pela navbar flutuante: as telas usam isso como padding inferior. */
+export function useTabBarSpace() {
+  const insets = useSafeAreaInsets();
+  return ICON_SIZE + BAR_PADDING_TOP + Math.max(insets.bottom, 12);
+}
+
+/**
+ * Figma: "NAVBAR" — fundo de vidro (blur + rgba(217,217,217,.2)) flutuando sobre o conteúdo,
+ * com uma barra interna de 300×60 e 5 ícones de traço. O Figma não desenha estado ativo;
+ * por usabilidade, os ícones inativos ficam com 55% de opacidade.
+ */
 export function AppTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-      {state.routes.map((route, index) => {
-        const focused = state.index === index;
-        const onPress = () => {
-          const event = navigation.emit({
-            type: "tabPress",
-            target: route.key,
-            canPreventDefault: true,
-          });
+    <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      {Platform.OS === "web" ? (
+        <View style={[StyleSheet.absoluteFill, styles.webGlass]} />
+      ) : (
+        <BlurView intensity={30} tint="light" style={StyleSheet.absoluteFill} />
+      )}
+      <View style={[StyleSheet.absoluteFill, styles.tint]} />
 
-          if (!focused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
-          }
-        };
+      <View style={styles.bar}>
+        <View style={styles.barGlass} />
+        {state.routes.map((route, index) => {
+          const focused = state.index === index;
+          const entry = ICONS[route.name];
+          const onPress = () => {
+            const event = navigation.emit({
+              type: "tabPress",
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!focused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
 
-        if (route.name === "create") {
           return (
             <Pressable
               key={route.key}
               onPress={onPress}
-              style={styles.fabHit}
-              android_ripple={{ color: "#2C5A94", foreground: true }}
+              accessibilityRole="tab"
+              accessibilityLabel={entry?.label ?? route.name}
+              accessibilityState={{ selected: focused }}
+              style={({ pressed }) => [
+                styles.item,
+                !focused && styles.inactive,
+                pressed && styles.pressed,
+              ]}
             >
-              <View style={styles.fab}>
-                <Ionicons name="add" size={32} color="#FFFFFF" />
-              </View>
+              {entry ? <entry.Icon width={ICON_SIZE} height={ICON_SIZE} /> : null}
             </Pressable>
           );
-        }
-
-        return (
-          <Pressable key={route.key} onPress={onPress} style={styles.item}>
-            <Ionicons
-              name={
-                focused
-                  ? (ICONS[route.name]?.on ?? "ellipse")
-                  : (ICONS[route.name]?.off ?? "ellipse-outline")
-              }
-              size={26}
-              color={focused ? colors.primary : "#3F3F3F"}
-            />
-          </Pressable>
-        );
-      })}
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: BAR_PADDING_TOP,
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  webGlass: {
+    backgroundColor: "rgba(250,250,250,0.85)",
+  },
+  tint: {
+    backgroundColor: "rgba(217,217,217,0.2)",
+  },
   bar: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    backgroundColor: colors.background,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#E5E7EB",
-    paddingTop: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: -2 },
-    elevation: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  barGlass: {
+    position: "absolute",
+    left: 1,
+    right: 1,
+    height: 60,
+    borderRadius: 20,
+    backgroundColor: "rgba(217,217,217,0.2)",
+    opacity: 0.5,
   },
   item: {
-    flex: 1,
+    width: ICON_SIZE,
+    height: ICON_SIZE,
     alignItems: "center",
     justifyContent: "center",
-    height: 48,
   },
-  fabHit: {
-    flex: 1,
-    alignItems: "center",
-    marginTop: -18,
+  inactive: {
+    opacity: 0.55,
   },
-  fab: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: colors.primary,
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+  pressed: {
+    opacity: 0.35,
   },
 });

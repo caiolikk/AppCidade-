@@ -164,6 +164,8 @@ Regra: **se mudou JavaScript/TypeScript, não precisa. Se mudou algo nativo, pre
 | Dependência **JS pura** (ex.: `date-fns`, `zod`) | Não | `npm install` + reiniciar o Metro |
 | `EXPO_PUBLIC_*` em `apps/mobile/.env` | Não | Reiniciar o Metro (`npm run dev:mobile -- --clear`) |
 | Dependência **com código nativo** (`expo-*` com módulo nativo, `react-native-*`) | **Sim** | `npx expo install <pkg>` em `apps/mobile` + novo build |
+| Novo SVG/PNG em `apps/mobile/assets/figma/` | Não | Fast Refresh (o SVG vira componente JS) |
+| Mudança no `metro.config.js` | Não | Reiniciar o Metro com `npm run dev:mobile -- --clear` |
 | Permissões, plugins no `app.json`, ícone, splash, nome, `scheme`, `package` | **Sim** | Novo build |
 | Chave do Google Maps | **Sim** | Novo build |
 | Atualizar o Expo SDK | **Sim** (e atualizar o projeto) | Plano próprio; só quando necessário |
@@ -205,4 +207,6 @@ O Development Build é **o tipo de app**; o EAS Build é **onde ele é compilado
 | App: "Network request failed" | API parada, celular em outra rede ou firewall bloqueando a porta 3333 |
 | Expo Go: "Project is incompatible with this version of Expo Go" | Esperado quando a loja atualiza. Use o dev build |
 | Build: duplicate native module | `npx expo-doctor`; ver [[PROBLEMS]] P-006 |
+| App fecha ao abrir: `RNSVG...`, `ExpoLinearGradient` ou `ExpoBlur` não encontrado | Development build antigo (anterior à D-020). Instale o build novo |
+| `npm install` falha com EPERM no `prisma generate` | API rodando segura a DLL do Prisma. Ver [[PROBLEMS]] P-010 |
 | Comportamento estranho após trocar de branch | `npm install` e `npm run dev:mobile -- --clear` |

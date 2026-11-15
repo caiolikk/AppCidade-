@@ -9,6 +9,7 @@ import { authRoutes } from "./modules/auth/auth.routes.js";
 import { categoryRoutes } from "./modules/categories/category.routes.js";
 import { occurrenceRoutes } from "./modules/occurrences/occurrence.routes.js";
 import { uploadRoutes } from "./modules/uploads/upload.routes.js";
+import { profileRoutes } from "./modules/users/profile.routes.js";
 import { localUploadDir } from "./services/upload.js";
 import { HttpError } from "./utils/http-error.js";
 
@@ -21,6 +22,9 @@ export async function buildApp() {
 
   await app.register(cors, {
     origin: true,
+    // O @fastify/cors 11 libera só GET/HEAD/POST por padrão: no navegador, PATCH/PUT/DELETE
+    // (perfil, avatar, status) falhavam no preflight. Ver docs/PROBLEMS.md P-014.
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
   });
 
   await app.register(multipart, {
@@ -66,6 +70,7 @@ export async function buildApp() {
   await app.register(categoryRoutes);
   await app.register(occurrenceRoutes);
   await app.register(uploadRoutes);
+  await app.register(profileRoutes);
 
   return app;
 }

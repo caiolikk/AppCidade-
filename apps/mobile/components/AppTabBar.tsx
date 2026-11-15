@@ -9,10 +9,12 @@ import NavMap from "../assets/figma/nav-map.svg";
 import NavNotify from "../assets/figma/nav-notify.svg";
 import NavProfile from "../assets/figma/nav-profile.svg";
 import NavReport from "../assets/figma/nav-report.svg";
+import { colors } from "../theme";
 
+/** Chave = nome da rota em `app/(tabs)`. O mapa é a rota `index` (tela inicial, D-023). */
 const ICONS: Record<string, { Icon: FC<SvgProps>; label: string }> = {
-  index: { Icon: NavHome, label: "Início" },
-  map: { Icon: NavMap, label: "Mapa" },
+  nearby: { Icon: NavHome, label: "Ocorrências perto de você" },
+  index: { Icon: NavMap, label: "Mapa" },
   create: { Icon: NavReport, label: "Nova ocorrência" },
   notifications: { Icon: NavNotify, label: "Notificações" },
   account: { Icon: NavProfile, label: "Minha conta" },
@@ -31,7 +33,8 @@ export function useTabBarSpace() {
 /**
  * Figma: "NAVBAR" — fundo de vidro (blur + rgba(217,217,217,.2)) flutuando sobre o conteúdo,
  * com uma barra interna de 300×60 e 5 ícones de traço. O Figma não desenha estado ativo;
- * por usabilidade, os ícones inativos ficam com 55% de opacidade.
+ * por usabilidade, os ícones inativos ficam com 55% de opacidade e o ativo ganha um ponto
+ * verde embaixo (a seção atual fica evidente entre mapa e "perto de você").
  */
 export function AppTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -75,6 +78,7 @@ export function AppTabBar({ state, navigation }: BottomTabBarProps) {
               ]}
             >
               {entry ? <entry.Icon width={ICON_SIZE} height={ICON_SIZE} /> : null}
+              {focused ? <View style={styles.activeDot} /> : null}
             </Pressable>
           );
         })}
@@ -121,6 +125,14 @@ const styles = StyleSheet.create({
   },
   inactive: {
     opacity: 0.55,
+  },
+  activeDot: {
+    position: "absolute",
+    bottom: 7,
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
   },
   pressed: {
     opacity: 0.35,

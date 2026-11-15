@@ -45,6 +45,10 @@ model User {
   neighborhood         String
   /// Polígono oficial usado no geofencing. Não aceitar bairro livre do client.
   santosNeighborhoodId String?
+  /// Foto de perfil (D-025): URL pública da miniatura; null = sem foto.
+  avatarUrl            String?
+  /// Id do arquivo no Cloudinary ou "local-<uuid>", usado para apagar a foto anterior.
+  avatarPublicId       String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -58,29 +62,50 @@ model User {
 }
 
 model Category {
-  id          String       @id @default(uuid())
-  name        String       @unique
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  occurrences Occurrence[]
+  id            String        @id @default(uuid())
+  name          String        @unique
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  occurrences   Occurrence[]
+  subcategories Subcategory[]
 
   @@map("categories")
 }
 
+/// Subcategoria do Figma (D-022). Opções definidas no seed; "Outros" fecha cada lista.
+model Subcategory {
+  id          String       @id @default(uuid())
+  categoryId  String
+  name        String       @db.VarChar(80)
+  description String?      @db.VarChar(160)
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  category    Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  occurrences Occurrence[]
+
+  @@unique([categoryId, name])
+  @@index([categoryId])
+  @@map("subcategories")
+}
+
 /// Ocorrência urbana. Foto obrigatória e geofencing são regras de aplicação (ETAPAS 7–8).
 model Occurrence {
-  id          String           @id @default(uuid())
-  title       String           @db.VarChar(200)
-  description String           @db.VarChar(500)
-  latitude    Decimal          @db.Decimal(9, 6)
-  longitude   Decimal          @db.Decimal(9, 6)
-  status      OccurrenceStatus @default(REPORTADA)
-  categoryId  String
-  userId      String
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id            String           @id @default(uuid())
+  title         String           @db.VarChar(200)
+  description   String           @db.VarChar(500)
+  latitude      Decimal          @db.Decimal(9, 6)
+  longitude     Decimal          @db.Decimal(9, 6)
+  status        OccurrenceStatus @default(REPORTADA)
+  categoryId    String
+  /// Opcional: ocorrências anteriores à D-022 e categorias sem subcategoria ficam null.
+  subcategoryId String?
+  userId        String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
   category      Category                  @relation(fields: [categoryId], references: [id])
+  subcategory   Subcategory?              @relation(fields: [subcategoryId], references: [id], onDelete: Restrict)
   user          User                      @relation(fields: [userId], references: [id])
   media         OccurrenceMedia[]
   evaluations   Evaluation[]
@@ -88,6 +113,7 @@ model Occurrence {
 
   @@index([userId])
   @@index([categoryId])
+  @@index([subcategoryId])
   @@index([status])
   @@map("occurrences")
 }
@@ -109,12 +135,12 @@ model OccurrenceMedia {
 
 /// Bairros de Santos. geom em SRID 4326; comparação espacial via $queryRaw + ST_Contains.
 model SantosNeighborhood {
-  id             String                             @id @default(uuid())
-  name           String                             @unique
-  normalizedName String                             @unique
+  id             String                                 @id @default(uuid())
+  name           String                                 @unique
+  normalizedName String                                 @unique
   geom           Unsupported("geometry(Polygon, 4326)")
-  createdAt      DateTime                           @default(now())
-  updatedAt      DateTime                           @updatedAt
+  createdAt      DateTime                               @default(now())
+  updatedAt      DateTime                               @updatedAt
 
   users User[]
 

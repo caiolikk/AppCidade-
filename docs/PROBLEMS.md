@@ -81,3 +81,12 @@ atualizado: 2026-11-13
 - **Sintoma:** só o quadrante superior esquerdo do pin aparecia (print do usuário).
 - **Causa raiz:** o `react-native-maps` converte Views filhas de `<Marker>` em **snapshot**. O pin tinha imagem absoluta maior que o container (recorte de 151%), `overflow: hidden` aninhado, `elevation`, tamanho dinâmico e `tracksViewChanges` desligado por timer → bitmap do tamanho errado.
 - **Solução:** pins **pré-renderizados** (`Marker image`, @2x/@3x) gerados por `apps/mobile/scripts/generate-pins.ps1`. Evite Views complexas dentro de `Marker` no Android; se precisar, use tamanho fixo e sem filhos que extrapolem.
+- **Atualização (2026-11-14, D-026):** o mesmo script gera bolinhas, selos, pins em 3 tamanhos e grupos. No iOS (Apple Maps) o `anchor` é ignorado: pins com cauda precisam de `centerOffset = (0, -(diâmetro+16)/2)`, aplicado no `MapCanvas`.
+- **Atualização (2026-11-14, D-027):** sem selos nem grupos; só bolinhas e pins em 7 tamanhos (28 a 52), com cauda proporcional. O offset virou `-(pinHeight(d))/2`, com `pinHeight(d) = d + 3 + round(13d/44)` (`lib/map-markers.ts`, igual ao script).
+
+## P-014 — PATCH/PUT/DELETE falham no navegador ("Não foi possível conectar à API")
+**Status:** Resolvido (2026-11-14)
+- **Sintoma:** no app web, salvar o perfil dava "Não foi possível conectar à API", com a API no ar. No Android/iOS o problema não aparece.
+- **Causa raiz:** o `@fastify/cors` 11 libera por padrão só `GET,HEAD,POST`. O preflight do `PATCH /me` voltava sem o método permitido, e o navegador bloqueava a requisição (o `fetch` falha como erro de rede). Até então o app só usava GET/POST; o `PATCH` de status do admin nunca tinha sido chamado de um navegador.
+- **Solução:** `methods: ["GET","HEAD","POST","PUT","PATCH","DELETE"]` no `app.register(cors, …)` (`apps/api/src/app.ts`). Conferido com um `OPTIONS` via curl e no app web.
+- **Relacionado:** no navegador o `FormData` com `{ uri }` do React Native vira "[object Object]", então `lib/api.ts → imageFormData` lê a imagem como Blob na web.

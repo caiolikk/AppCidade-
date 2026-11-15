@@ -12,6 +12,7 @@ const emptyVotes = (): VoteCount => ({
 export function toPublicOccurrence(input: {
   occurrence: Occurrence & {
     category: { id: string; name: string };
+    subcategory: { id: string; name: string } | null;
     media: OccurrenceMedia[];
     evaluations: { type: EvaluationType }[];
   };
@@ -28,6 +29,8 @@ export function toPublicOccurrence(input: {
     description: input.occurrence.description,
     status: input.occurrence.status,
     category: input.occurrence.category,
+    // null em ocorrências anteriores às subcategorias (D-022) e na categoria "Outros".
+    subcategory: input.occurrence.subcategory,
     latitude: Number(input.occurrence.latitude),
     longitude: Number(input.occurrence.longitude),
     thumbnailUrl: input.occurrence.media[0]?.thumbnailUrl ?? null,
@@ -39,6 +42,7 @@ export function toPublicOccurrence(input: {
 export function toAdminOccurrence(input: {
   occurrence: Occurrence & {
     category: { id: string; name: string };
+    subcategory: { id: string; name: string } | null;
     media: OccurrenceMedia[];
     evaluations: { type: EvaluationType }[];
     user: {

@@ -21,6 +21,11 @@ import { useTabBarSpace } from "../../components/AppTabBar";
 import { CategoryIcon } from "../../components/CategoryIcon";
 import { LocationPicker, type Coords } from "../../components/LocationPicker";
 import { PrimaryButton } from "../../components/PrimaryButton";
+import {
+  SubcategoryMenu,
+  subcategoryLabel,
+  type MenuAnchor,
+} from "../../components/SubcategoryMenu";
 import { SuccessPopup } from "../../components/SuccessPopup";
 import { useCategories } from "../../hooks/use-feed";
 import { api, apiUploadImage, ApiError } from "../../lib/api";
@@ -42,6 +47,13 @@ export default function CreateScreen() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
+  // Ícones das categorias, para ancorar o menu de subcategorias no ícone tocado (Figma).
+  const categoryRefs = useRef<Record<string, View | null>>({});
+  // Último título preenchido automaticamente com a subcategoria (só ele é substituído).
+  const autoTitleRef = useRef<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoType, setPhotoType] = useState("image/jpeg");
   const [coords, setCoords] = useState<Coords | null>(null);
@@ -90,10 +102,71 @@ export default function CreateScreen() {
     setGeoMessage(null);
   }
 
+  const selectedCategory = categoriesQuery.data?.find((item) => item.id === categoryId) ?? null;
+  const subcategories = selectedCategory?.subcategories ?? [];
+  const selectedSubcategory = subcategories.find((item) => item.id === subcategoryId) ?? null;
+  // Categoria sem opções (ex.: "Outros") dispensa subcategoria; as demais exigem (D-022).
+  const categoryReady = Boolean(selectedCategory) && (subcategories.length === 0 || Boolean(selectedSubcategory));
+
+  /** Troca o título só se ele estiver vazio ou ainda for o preenchido automaticamente. */
+  function applyAutoTitle(next: string | null) {
+    setTitle((current) => {
+      const untouched = current.trim() === "" || current === autoTitleRef.current;
+      if (!untouched) {
+        return current;
+      }
+      autoTitleRef.current = next;
+      return next ?? "";
+    });
+  }
+
+  function openMenu(id: string) {
+    const node = categoryRefs.current[id];
+    const show = (anchor: MenuAnchor | null) => {
+      setMenuAnchor(anchor);
+      setMenuOpen(true);
+    };
+    if (!node) {
+      show(null);
+      return;
+    }
+    node.measureInWindow((x, y, width, height) =>
+      show(width > 0 ? { x, y, width, height } : null),
+    );
+  }
+
+  /**
+   * Figma: tocar numa categoria abre o menu com as subcategorias dela. Trocar de categoria
+   * limpa a subcategoria anterior (evita combinação inválida); tocar de novo na mesma
+   * reabre o menu para mudar a opção.
+   */
+  function selectCategory(id: string) {
+    setError(null);
+    if (id !== categoryId) {
+      setCategoryId(id);
+      setSubcategoryId(null);
+      applyAutoTitle(null);
+    }
+    const category = categoriesQuery.data?.find((item) => item.id === id);
+    if (category?.subcategories?.length) {
+      openMenu(id);
+    }
+  }
+
+  function selectSubcategory(id: string, name: string) {
+    setSubcategoryId(id);
+    setMenuOpen(false);
+    setError(null);
+    // Sugere o título com a subcategoria (o "Outros" não diz nada, então não sugere).
+    applyAutoTitle(name === "Outros" ? null : name);
+  }
+
   function resetForm() {
     setTitle("");
     setDescription("");
     setCategoryId(null);
+    setSubcategoryId(null);
+    autoTitleRef.current = null;
     setPhotoUri(null);
     setPhotoType("image/jpeg");
     setError(null);
@@ -156,6 +229,10 @@ export default function CreateScreen() {
       setError("Escolha uma categoria.");
       return;
     }
+    if (!categoryReady) {
+      setError("Escolha uma subcategoria.");
+      return;
+    }
     if (title.trim().length < 3) {
       setError("O título precisa ter pelo menos 3 caracteres.");
       return;
@@ -189,6 +266,7 @@ export default function CreateScreen() {
           latitude: coords.latitude,
           longitude: coords.longitude,
           categoryId,
+          subcategoryId: selectedSubcategory?.id,
           media: [media],
         },
       });
@@ -211,17 +289,17 @@ export default function CreateScreen() {
     const id = createdId;
     setCreatedId(null);
     if (id) {
-      router.replace({ pathname: "/map", params: { focus: id, focusKey: String(Date.now()) } });
+      router.replace({ pathname: "/", params: { focus: id, focusKey: String(Date.now()) } });
     }
   }, [createdId, router]);
 
   // Barra de etapas do Figma (5 segmentos), refletindo o que já foi preenchido.
   const steps = [
-    Boolean(categoryId),
+    categoryReady,
     title.trim().length >= 3 && description.trim().length >= 3,
     Boolean(coords),
     Boolean(photoUri),
-    Boolean(categoryId && coords && photoUri && title.trim().length >= 3 && description.trim().length >= 3),
+    Boolean(categoryReady && coords && photoUri && title.trim().length >= 3 && description.trim().length >= 3),
   ];
   const ready = steps[4];
 
@@ -258,15 +336,48 @@ export default function CreateScreen() {
                   { alignItems: (["flex-start", "center", "flex-end"] as const)[index % 3] },
                 ]}
               >
-                <CategoryIcon
-                  name={item.name}
-                  selected={item.id === categoryId}
-                  dimmed={categoryId !== null && item.id !== categoryId}
-                  onPress={() => setCategoryId(item.id)}
-                />
+                <View
+                  ref={(node) => {
+                    categoryRefs.current[item.id] = node;
+                  }}
+                  collapsable={false}
+                >
+                  <CategoryIcon
+                    name={item.name}
+                    selected={item.id === categoryId}
+                    dimmed={categoryId !== null && item.id !== categoryId}
+                    onPress={() => selectCategory(item.id)}
+                  />
+                </View>
               </View>
             ))}
           </View>
+
+          {/* Relação categoria → subcategoria escolhida (o Figma só desenha o menu aberto). */}
+          {selectedCategory && subcategories.length > 0 ? (
+            <Pressable
+              onPress={() => openMenu(selectedCategory.id)}
+              accessibilityRole="button"
+              accessibilityLabel={
+                selectedSubcategory
+                  ? `${selectedCategory.name}, ${selectedSubcategory.name}. Alterar subcategoria`
+                  : `Escolher a subcategoria de ${selectedCategory.name}`
+              }
+              style={({ pressed }) => [styles.subcategory, pressed && styles.pressed]}
+            >
+              <Text style={styles.subcategoryText} numberOfLines={1}>
+                <Text style={styles.subcategoryParent}>{selectedCategory.name} › </Text>
+                {selectedSubcategory ? (
+                  subcategoryLabel(selectedSubcategory.name)
+                ) : (
+                  <Text style={styles.subcategoryMissing}>escolha o tipo do problema</Text>
+                )}
+              </Text>
+              <Text style={styles.subcategoryAction}>
+                {selectedSubcategory ? "Alterar" : "Escolher"}
+              </Text>
+            </Pressable>
+          ) : null}
 
           <View style={styles.divider} />
 
@@ -348,6 +459,16 @@ export default function CreateScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
+      <SubcategoryMenu
+        visible={menuOpen && subcategories.length > 0}
+        categoryName={selectedCategory?.name ?? ""}
+        subcategories={subcategories}
+        selectedId={subcategoryId}
+        anchor={menuAnchor}
+        onSelect={(item) => selectSubcategory(item.id, item.name)}
+        onClose={() => setMenuOpen(false)}
+      />
+
       <SuccessPopup
         visible={createdId !== null}
         title="Ocorrência Enviada!"
@@ -415,6 +536,38 @@ const styles = StyleSheet.create({
   },
   categoryCell: {
     width: "33.333%",
+  },
+  subcategory: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginHorizontal: SIDE,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.background,
+  },
+  subcategoryText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  subcategoryParent: {
+    color: colors.primary,
+    fontWeight: "700",
+  },
+  subcategoryMissing: {
+    color: colors.muted,
+    fontWeight: "400",
+  },
+  subcategoryAction: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "700",
   },
   picker: {
     marginHorizontal: SIDE,

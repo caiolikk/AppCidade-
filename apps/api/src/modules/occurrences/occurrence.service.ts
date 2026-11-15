@@ -11,8 +11,10 @@ import type {
 } from "./occurrence.schemas.js";
 import type { z } from "zod";
 
-const occurrencePublicInclude = {
+/** Include padrão dos DTOs de ocorrência (também usado pelo perfil, D-025). */
+export const occurrencePublicInclude = {
   category: { select: { id: true, name: true } },
+  subcategory: { select: { id: true, name: true } },
   media: { orderBy: { createdAt: "asc" as const } },
   evaluations: { select: { type: true } },
 };
@@ -36,10 +38,21 @@ export async function createOccurrence(
 
   const category = await prisma.category.findUnique({
     where: { id: input.categoryId },
+    include: { subcategories: { select: { id: true } } },
   });
 
   if (!category) {
     throw new HttpError(400, "Categoria inexistente.");
+  }
+
+  // D-022: a subcategoria tem de ser da categoria escolhida; é obrigatória quando a
+  // categoria tem opções (a categoria "Outros" não tem).
+  if (input.subcategoryId) {
+    if (!category.subcategories.some((item) => item.id === input.subcategoryId)) {
+      throw new HttpError(400, "A subcategoria não pertence à categoria escolhida.");
+    }
+  } else if (category.subcategories.length > 0) {
+    throw new HttpError(400, "Escolha uma subcategoria.");
   }
 
   // Regra de bairro desativada temporariamente (D-018). A estrutura continua disponível.
@@ -59,6 +72,7 @@ export async function createOccurrence(
         latitude: input.latitude,
         longitude: input.longitude,
         categoryId: input.categoryId,
+        subcategoryId: input.subcategoryId ?? null,
         userId,
         media: {
           create: input.media.map((item) => ({

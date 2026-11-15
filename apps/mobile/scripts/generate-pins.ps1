@@ -1,7 +1,10 @@
-# Gera os bitmaps dos pins do mapa (plano ocorrencias-criacao-e-mapa, 2026-11-14).
-# Pin estilo Waze com a identidade do Cidade+: anel na cor do status (Figma), miolo branco,
-# ilustracao da categoria recortada (mesmo recorte do Figma) e cauda apontando para o local.
-# Saida: assets/pins/pin-<categoria>-<status>[-sel]@2x.png e @3x.png + lib/pin-images.ts
+# Gera os bitmaps dos marcadores do mapa (plano ocorrencias-criacao-e-mapa; D-027).
+# Bitmaps (e nao Views) por causa do P-013 (snapshot cortado no Android). Sem agrupamento.
+#   dot-<status>-<d>        bolinha na cor do status com contorno branco (so com o mapa bem afastado)
+#   pin-<cat>-<status>-<d>  icone: pin com ilustracao da categoria e anel do status (diminui ao afastar)
+#   pin-<cat>-<status>-sel  selecionado (58, um so tamanho)
+# Os tamanhos DEVEM bater com lib/map-markers.ts (MARKER_SIZES, SELECTED_PIN_SIZE, pinHeight).
+# Saida: assets/pins/*@2x.png e @3x.png + lib/pin-images.ts
 # Uso (PowerShell, na pasta apps/mobile):  powershell -ExecutionPolicy Bypass -File scripts/generate-pins.ps1
 
 Add-Type -AssemblyName System.Drawing
@@ -9,6 +12,8 @@ $root = Split-Path -Parent $PSScriptRoot
 $artDir = Join-Path $root "assets\figma"
 $outDir = Join-Path $root "assets\pins"
 New-Item -ItemType Directory -Force $outDir | Out-Null
+# Os PNGs desta pasta sao todos gerados aqui: limpa para nao sobrar variante antiga.
+Get-ChildItem $outDir -Filter *.png | Remove-Item -Force
 
 # Recorte das ilustracoes (igual a lib/category-art.ts): largura, altura, esquerda, topo (fracoes do quadro)
 $categories = [ordered]@{
@@ -25,84 +30,124 @@ $statuses = [ordered]@{
   "resolvido" = "#0B701A"
   "negado"    = "#AC0C0C"
 }
-$variants = @(@{ suffix = ""; d = 44 }, @{ suffix = "-sel"; d = 54 })
+$dotSizes = @(10, 12, 14)
+$pinSizes = @(28, 32, 36, 40, 44, 48, 52)
+$selectedSize = 58
 $scales = @(2, 3)
 
-function New-Pin($artPath, $crop, $ringHex, $d, $s, $outPath) {
-  $w = [int](($d + 6) * $s)
-  $h = [int](($d + 16) * $s)
-  $bmp = New-Object System.Drawing.Bitmap $w, $h, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+function New-Canvas($w, $h) {
+  $bmp = New-Object System.Drawing.Bitmap ([int]$w), ([int]$h), ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
   $g = [System.Drawing.Graphics]::FromImage($bmp)
   $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
   $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
   $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+  $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
   $g.Clear([System.Drawing.Color]::Transparent)
+  return @($bmp, $g)
+}
 
-  $ring = [System.Drawing.ColorTranslator]::FromHtml($ringHex)
-  $cx = $w / 2.0
-  $cy = (3 + $d / 2.0) * $s
-  $r = $d / 2.0 * $s
+function Fill-Circle($g, $color, $cx, $cy, $r) {
+  $brush = New-Object System.Drawing.SolidBrush $color
+  $g.FillEllipse($brush, [single]($cx - $r), [single]($cy - $r), [single](2 * $r), [single](2 * $r))
+  $brush.Dispose()
+}
 
-  # Sombra suave (camadas concentricas translucidas, deslocadas para baixo)
+function Draw-Shadow($g, $cx, $cy, $r, $s, $strength) {
   for ($i = 3; $i -ge 1; $i--) {
-    $alpha = 18 * (4 - $i)
-    $shadow = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb($alpha, 0, 0, 0))
-    $sr = $r + $i * 0.6 * $s
-    $g.FillEllipse($shadow, [single]($cx - $sr), [single]($cy - $sr + 1.5 * $s), [single](2 * $sr), [single](2 * $sr))
-    $shadow.Dispose()
+    $alpha = [int]($strength * (4 - $i))
+    $c = [System.Drawing.Color]::FromArgb($alpha, 0, 0, 0)
+    Fill-Circle $g $c $cx ($cy + 1.0 * $s) ($r + $i * 0.5 * $s)
   }
+}
 
-  # Cauda (triangulo) apontando para o ponto exato (base do bitmap = ancora)
-  $ringBrush = New-Object System.Drawing.SolidBrush $ring
-  $tail = @(
-    (New-Object System.Drawing.PointF ([single]($cx - 8 * $s)), ([single]($cy + $r - 7 * $s))),
-    (New-Object System.Drawing.PointF ([single]($cx + 8 * $s)), ([single]($cy + $r - 7 * $s))),
-    (New-Object System.Drawing.PointF ([single]$cx), ([single]($h - 1)))
-  )
-  $g.FillPolygon($ringBrush, $tail)
-
-  # Anel na cor do status + miolo claro
-  $g.FillEllipse($ringBrush, [single]($cx - $r), [single]($cy - $r), [single](2 * $r), [single](2 * $r))
-  $inner = $r - 3 * $s
-  $white = New-Object System.Drawing.SolidBrush ([System.Drawing.ColorTranslator]::FromHtml("#FAFAFA"))
-  $g.FillEllipse($white, [single]($cx - $inner), [single]($cy - $inner), [single](2 * $inner), [single](2 * $inner))
-
-  # Ilustracao recortada num circulo (1 px de folga dentro do miolo)
-  $box = 2 * ($inner - 1 * $s)
-  $bx = $cx - $box / 2
-  $by = $cy - $box / 2
+function Draw-Art($g, $artPath, $crop, $cx, $cy, $radius) {
+  $box = 2 * $radius
+  $bx = $cx - $radius
+  $by = $cy - $radius
   $clip = New-Object System.Drawing.Drawing2D.GraphicsPath
   $clip.AddEllipse([single]$bx, [single]$by, [single]$box, [single]$box)
   $g.SetClip($clip)
   $art = [System.Drawing.Image]::FromFile($artPath)
   $g.DrawImage($art, [single]($bx + $box * $crop[2]), [single]($by + $box * $crop[3]), [single]($box * $crop[0]), [single]($box * $crop[1]))
   $g.ResetClip()
+  $art.Dispose(); $clip.Dispose()
+}
 
-  $bmp.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Png)
-  $art.Dispose(); $clip.Dispose(); $white.Dispose(); $ringBrush.Dispose(); $g.Dispose(); $bmp.Dispose()
+$white = [System.Drawing.ColorTranslator]::FromHtml("#FFFFFF")
+$paper = [System.Drawing.ColorTranslator]::FromHtml("#FAFAFA")
+
+# Bolinha: contorno branco (2) + status. Quadro com folga de 2 para a sombra; ancora no centro.
+function New-Dot($hex, $d, $s, $out) {
+  $w = ($d + 4) * $s
+  $c = New-Canvas $w $w; $bmp = $c[0]; $g = $c[1]
+  $cx = $w / 2.0; $r = $d / 2.0 * $s
+  Draw-Shadow $g $cx $cx $r $s 12
+  Fill-Circle $g $white $cx $cx $r
+  Fill-Circle $g ([System.Drawing.ColorTranslator]::FromHtml($hex)) $cx $cx ($r - 2 * $s)
+  $bmp.Save($out, [System.Drawing.Imaging.ImageFormat]::Png); $g.Dispose(); $bmp.Dispose()
+}
+
+# Pin (o mesmo desenho validado antes): anel do status, miolo, ilustracao e cauda.
+# Cauda proporcional ao diametro (13/44 abaixo do circulo; igual a pinHeight() no TS):
+# altura logica = 3 + d + round(d*13/44). A ponta da cauda e a base do bitmap -> anchor (0.5, 1).
+function New-Pin($artPath, $crop, $hex, $d, $s, $out) {
+  $tail = [math]::Round($d * 13 / 44, [System.MidpointRounding]::AwayFromZero)
+  $k = $d / 44.0
+  $w = ($d + 6) * $s
+  $h = ($d + 3 + $tail) * $s
+  $c = New-Canvas $w $h; $bmp = $c[0]; $g = $c[1]
+  $ring = [System.Drawing.ColorTranslator]::FromHtml($hex)
+  $cx = $w / 2.0
+  $cy = (3 + $d / 2.0) * $s
+  $r = $d / 2.0 * $s
+  for ($i = 3; $i -ge 1; $i--) {
+    $alpha = 18 * (4 - $i)
+    Fill-Circle $g ([System.Drawing.Color]::FromArgb($alpha, 0, 0, 0)) $cx ($cy + 1.5 * $s) ($r + $i * 0.6 * $s)
+  }
+  $ringBrush = New-Object System.Drawing.SolidBrush $ring
+  $tailPts = @(
+    (New-Object System.Drawing.PointF ([single]($cx - 8 * $k * $s)), ([single]($cy + $r - 7 * $k * $s))),
+    (New-Object System.Drawing.PointF ([single]($cx + 8 * $k * $s)), ([single]($cy + $r - 7 * $k * $s))),
+    (New-Object System.Drawing.PointF ([single]$cx), ([single]($h - 1)))
+  )
+  $g.FillPolygon($ringBrush, $tailPts)
+  $ringBrush.Dispose()
+  Fill-Circle $g $ring $cx $cy $r
+  $ringWidth = [math]::Max(2.5, 3 * $k)
+  $inner = $r - $ringWidth * $s
+  Fill-Circle $g $paper $cx $cy $inner
+  Draw-Art $g $artPath $crop $cx $cy ($inner - [math]::Max(0.5, $k) * $s)
+  $bmp.Save($out, [System.Drawing.Imaging.ImageFormat]::Png); $g.Dispose(); $bmp.Dispose()
 }
 
 $ts = New-Object System.Text.StringBuilder
 [void]$ts.AppendLine("// GERADO por scripts/generate-pins.ps1 - nao edite a mao.")
-[void]$ts.AppendLine("// Pins do mapa pre-renderizados (categoria x status x normal/selecionado).")
+[void]$ts.AppendLine("// Marcadores do mapa pre-renderizados (D-027). Chaves:")
+[void]$ts.AppendLine("//   dot/<status>/<d>   pin/<categoria>/<status>/<d>|sel")
 [void]$ts.AppendLine("// require() de imagem local devolve um id numerico (aceito por Marker.image e Image.source).")
 [void]$ts.AppendLine("")
-[void]$ts.AppendLine("export const PIN_IMAGES: Record<string, number> = {")
+[void]$ts.AppendLine("export const MARKER_IMAGES: Record<string, number> = {")
 
+foreach ($status in $statuses.Keys) {
+  foreach ($d in $dotSizes) {
+    $name = "dot-$status-$d"
+    foreach ($s in $scales) { New-Dot $statuses[$status] $d $s (Join-Path $outDir "$name@$($s)x.png") }
+    [void]$ts.AppendLine("  `"dot/$status/$d`": require(`"../assets/pins/$name.png`"),")
+  }
+}
 foreach ($cat in $categories.Keys) {
+  $artPath = Join-Path $artDir "category-$cat.png"
   foreach ($status in $statuses.Keys) {
-    foreach ($v in $variants) {
-      $name = "pin-$cat-$status$($v.suffix)"
-      foreach ($s in $scales) {
-        New-Pin (Join-Path $artDir "category-$cat.png") $categories[$cat] $statuses[$status] $v.d $s (Join-Path $outDir "$name@$($s)x.png")
-      }
-      [void]$ts.AppendLine("  `"$cat/$status$($v.suffix)`": require(`"../assets/pins/$name.png`"),")
+    $sel = "pin-$cat-$status-sel"
+    foreach ($s in $scales) { New-Pin $artPath $categories[$cat] $statuses[$status] $selectedSize $s (Join-Path $outDir "$sel@$($s)x.png") }
+    [void]$ts.AppendLine("  `"pin/$cat/$status/sel`": require(`"../assets/pins/$sel.png`"),")
+    foreach ($d in $pinSizes) {
+      $name = "pin-$cat-$status-$d"
+      foreach ($s in $scales) { New-Pin $artPath $categories[$cat] $statuses[$status] $d $s (Join-Path $outDir "$name@$($s)x.png") }
+      [void]$ts.AppendLine("  `"pin/$cat/$status/$d`": require(`"../assets/pins/$name.png`"),")
     }
   }
 }
 [void]$ts.AppendLine("};")
-[void]$ts.AppendLine("")
-[void]$ts.AppendLine("/** Tamanho logico (pt/dp) de cada variante; a ponta da cauda fica na base (anchor y = 1). */")
-[void]$ts.AppendLine("export const PIN_SIZE = { normal: { width: 50, height: 60 }, selected: { width: 60, height: 70 } } as const;")
 [System.IO.File]::WriteAllText((Join-Path $root "lib\pin-images.ts"), $ts.ToString(), (New-Object System.Text.UTF8Encoding $false))
 "ok: $((Get-ChildItem $outDir -Filter *.png).Count) arquivos"

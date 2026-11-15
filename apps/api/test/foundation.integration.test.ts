@@ -128,9 +128,15 @@ describe("fundação Cidade+", () => {
     expect(String(outside.body.message)).toMatch(/bairro residencial/i);
 
     const categories = await request("GET", "/categories");
-    const list = categories.body as unknown as Array<{ id: string; name: string }>;
+    const list = categories.body as unknown as Array<{
+      id: string;
+      name: string;
+      subcategories: Array<{ id: string; name: string }>;
+    }>;
     const buraco = list.find((item) => item.name === "Infraestrutura");
     expect(buraco).toBeTruthy();
+    const buracoCalcada = buraco!.subcategories.find((item) => item.name === "Buraco na calçada");
+    expect(buracoCalcada).toBeTruthy();
 
     const noPhoto = await request("POST", "/occurrences", {
       token,
@@ -140,6 +146,7 @@ describe("fundação Cidade+", () => {
         latitude: -23.989,
         longitude: -46.3075,
         categoryId: buraco!.id,
+        subcategoryId: buracoCalcada!.id,
         media: [],
       },
     });
@@ -163,6 +170,7 @@ describe("fundação Cidade+", () => {
         latitude: -23.989,
         longitude: -46.3075,
         categoryId: buraco!.id,
+        subcategoryId: buracoCalcada!.id,
         media: [
           {
             url: upload.body.url,
@@ -213,7 +221,11 @@ describe("fundação Cidade+", () => {
     const token = String(register.body.accessToken);
 
     const categories = await request("GET", "/categories");
-    const categoryId = (categories.body as unknown as Array<{ id: string }>)[0]!.id;
+    const firstCategory = (
+      categories.body as unknown as Array<{ id: string; subcategories: Array<{ id: string }> }>
+    )[0]!;
+    const categoryId = firstCategory.id;
+    const subcategoryId = firstCategory.subcategories[0]?.id;
 
     async function uploadPhoto() {
       const file = multipartPng();
@@ -239,6 +251,7 @@ describe("fundação Cidade+", () => {
           latitude,
           longitude,
           categoryId,
+          subcategoryId,
           media: [await uploadPhoto()],
           ...overrides,
         },
@@ -313,6 +326,123 @@ describe("fundação Cidade+", () => {
 
     // Só as 3 válidas foram persistidas para este usuário.
     expect(await prisma.occurrence.count({ where: { userId: user.id } })).toBe(3);
+  });
+
+  it("vincula categoria e subcategoria à ocorrência (D-022) e mantém as antigas sem subcategoria", async () => {
+    const cpf = uniqueCpf();
+    const register = await request("POST", "/auth/register", {
+      body: {
+        name: "Cidadão Subcategoria",
+        email: `subcat-${cpf}@cidade.plus`,
+        password: "senha1234",
+        cpf,
+        cep: "11030000",
+      },
+    });
+    expect(register.status).toBe(200);
+    const user = register.body.user as { id: string };
+    createdUserIds.push(user.id);
+    const token = String(register.body.accessToken);
+
+    type ApiCategory = {
+      id: string;
+      name: string;
+      subcategories: Array<{ id: string; name: string; description: string | null }>;
+    };
+    const categories = (await request("GET", "/categories")).body as unknown as ApiCategory[];
+    const byName = (name: string) => categories.find((item) => item.name === name)!;
+
+    // Opções e ordem dos prints do Figma; "Outros" fecha cada lista; categoria "Outros" sem menu.
+    expect(byName("Infraestrutura").subcategories.map((item) => item.name)).toEqual([
+      "Árvore caída",
+      "Buraco na calçada",
+      "Iluminação com problema",
+      "Fiação solta",
+      "Poste quebrado",
+      "Outros",
+    ]);
+    expect(byName("Limpeza").subcategories).toHaveLength(5);
+    expect(byName("Segurança").subcategories).toHaveLength(6);
+    expect(byName("Trânsito").subcategories[0]).toMatchObject({
+      name: "Acidente na via",
+      description: "Ocorrência de acidente",
+    });
+    expect(byName("Outros").subcategories).toEqual([]);
+
+    async function create(categoryId: string, subcategoryId?: string) {
+      const file = multipartPng();
+      const upload = await request("POST", "/uploads/image", {
+        token,
+        payload: file.payload,
+        headers: file.headers,
+      });
+      return request("POST", "/occurrences", {
+        token,
+        body: {
+          title: "Teste de subcategoria",
+          description: "Criada pelo teste de subcategorias.",
+          latitude: -23.989,
+          longitude: -46.3075,
+          categoryId,
+          subcategoryId,
+          media: [
+            {
+              url: upload.body.url,
+              thumbnailUrl: upload.body.thumbnailUrl,
+              publicId: upload.body.publicId,
+            },
+          ],
+        },
+      });
+    }
+
+    const transito = byName("Trânsito");
+    const semaforo = transito.subcategories.find((item) => item.name === "Semáforo com problema")!;
+
+    // Subcategoria correta → persistida e devolvida na lista e no detalhe.
+    const created = await create(transito.id, semaforo.id);
+    expect(created.status).toBe(200);
+    expect(created.body.subcategory).toEqual({ id: semaforo.id, name: semaforo.name });
+    const stored = await prisma.occurrence.findUnique({ where: { id: String(created.body.id) } });
+    expect(stored!.categoryId).toBe(transito.id);
+    expect(stored!.subcategoryId).toBe(semaforo.id);
+    const detail = await request("GET", `/occurrences/${created.body.id}`);
+    expect(detail.body.category).toEqual({ id: transito.id, name: "Trânsito" });
+    expect(detail.body.subcategory).toEqual({ id: semaforo.id, name: "Semáforo com problema" });
+    const list = (await request("GET", "/occurrences")).body as unknown as Array<{
+      id: string;
+      subcategory: unknown;
+    }>;
+    expect(list.find((item) => item.id === created.body.id)!.subcategory).toEqual({
+      id: semaforo.id,
+      name: "Semáforo com problema",
+    });
+
+    // Categoria com opções exige subcategoria; subcategoria de outra categoria é recusada.
+    const semSub = await create(transito.id);
+    expect(semSub.status).toBe(400);
+    expect(String(semSub.body.message)).toMatch(/subcategoria/i);
+    const misturada = await create(byName("Limpeza").id, semaforo.id);
+    expect(misturada.status).toBe(400);
+    expect(String(misturada.body.message)).toMatch(/não pertence/i);
+    const invalida = await create(transito.id, "nao-e-uuid");
+    expect(invalida.status).toBe(400);
+
+    // Categoria sem subcategorias ("Outros") continua aceitando sem subcategoria.
+    const outros = await create(byName("Outros").id);
+    expect(outros.status).toBe(200);
+    expect(outros.body.subcategory).toBeNull();
+
+    // Ocorrência "antiga" (sem subcategoria no banco) continua sendo lida sem erro.
+    await prisma.occurrence.update({
+      where: { id: String(created.body.id) },
+      data: { subcategoryId: null },
+    });
+    const legacy = await request("GET", `/occurrences/${created.body.id}`);
+    expect(legacy.status).toBe(200);
+    expect(legacy.body.subcategory).toBeNull();
+
+    expect(await prisma.occurrence.count({ where: { userId: user.id } })).toBe(2);
   });
 
   it("protege upload e rotas de gestor", async () => {

@@ -11,6 +11,7 @@ export function toPrivateUser(user: User) {
     cep: user.cep,
     neighborhood: user.neighborhood,
     santosNeighborhoodId: user.santosNeighborhoodId,
+    avatarUrl: user.avatarUrl,
     createdAt: user.createdAt,
   };
 }

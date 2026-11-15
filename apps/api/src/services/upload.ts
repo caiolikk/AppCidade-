@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
@@ -70,6 +70,37 @@ export async function storeOccurrenceImage(input: {
     thumbnailUrl: url,
     publicId: `local-${id}`,
   };
+}
+
+/**
+ * Apaga uma imagem guardada por `storeOccurrenceImage` (best effort: uma falha aqui não
+ * desfaz a operação principal). Usado ao trocar ou remover a foto de perfil (D-025).
+ */
+export async function deleteStoredImage(publicId: string | null | undefined) {
+  if (!publicId) {
+    return;
+  }
+  try {
+    if (publicId.startsWith("local-")) {
+      const id = publicId.slice("local-".length);
+      // O id é um UUID gerado aqui; o filtro impede qualquer caminho fora da pasta.
+      if (!/^[0-9a-f-]{36}$/i.test(id)) {
+        return;
+      }
+      const files = await readdir(localUploadDir);
+      await Promise.all(
+        files
+          .filter((name) => name.startsWith(`${id}.`))
+          .map((name) => unlink(path.join(localUploadDir, name))),
+      );
+      return;
+    }
+    if (isCloudinaryConfigured()) {
+      await cloudinary.uploader.destroy(publicId);
+    }
+  } catch {
+    // Arquivo órfão não impede trocar a foto; fica para limpeza manual.
+  }
 }
 
 function uploadToCloudinary(buffer: Buffer): Promise<StoredImage> {

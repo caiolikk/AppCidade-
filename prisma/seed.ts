@@ -111,6 +111,8 @@ async function main() {
     }
   }
 
+  await seedSubcategories();
+
   await upsertStaff({
     email: "admin@cidade.plus",
     name: "Admin Cidade+",
@@ -128,6 +130,76 @@ async function main() {
   });
 
   await removeDemoOccurrences();
+}
+
+/**
+ * D-022: subcategorias exatamente como nos prints do Figma ("Nova Ocorrência" → menu da
+ * categoria), na mesma ordem, com "Outros" por último. A categoria "Outros" não tem menu no
+ * Figma e por isso fica sem subcategorias. Única correção: "aréa" → "área" (digitação).
+ */
+const SUBCATEGORIES: Record<string, Array<[name: string, description: string | null]>> = {
+  Infraestrutura: [
+    ["Árvore caída", "Árvore caída atrapalhando circulação"],
+    ["Buraco na calçada", "Buraco e problemas na calçada"],
+    ["Iluminação com problema", "Mau funcionamento de iluminação"],
+    ["Fiação solta", "Fiação de eletricidade exposta"],
+    ["Poste quebrado", "Poste quebrado ou caído"],
+    ["Outros", null],
+  ],
+  Limpeza: [
+    ["Lixo acumulado", "Sujeira ou lixo espalhado"],
+    ["Lixeira com problema", "Mau uso, lixeira cheia ou quebrada"],
+    ["Lixo de eventos", "Lixo proveniente de evento ou atividade pública"],
+    ["Descarte incorreto", "Lixo descartado de modo incorreto"],
+    ["Outros", null],
+  ],
+  Segurança: [
+    ["Pessoa suspeita", "Pessoa suspeita em determinada área"],
+    ["Assalto ou roubo", "Denúncia de roubo que já ocorreu"],
+    ["Assédio ou abuso", "Denúncia de assédio que já ocorreu"],
+    ["Animal em perigo", "Denúncia de crime contra animais"],
+    ["Crime ambiental", "Denúncia de crimes ambientais"],
+    ["Outros", null],
+  ],
+  Trânsito: [
+    ["Acidente na via", "Ocorrência de acidente"],
+    ["Via interditada", "Vias impossibilitadas por terceiros"],
+    ["Buraco na rua", "Buraco em vias públicas"],
+    ["Placa ou sinalização", "Falta ou incoerência de sinalização"],
+    ["Semáforo com problema", "Mau funcionamento de semáforos"],
+    ["Outros", null],
+  ],
+};
+
+async function seedSubcategories() {
+  for (const [categoryName, items] of Object.entries(SUBCATEGORIES)) {
+    const category = await prisma.category.findUnique({ where: { name: categoryName } });
+    if (!category) {
+      continue;
+    }
+
+    for (const [index, [name, description]] of items.entries()) {
+      await prisma.subcategory.upsert({
+        where: { categoryId_name: { categoryId: category.id, name } },
+        update: { description, sortOrder: index },
+        create: { categoryId: category.id, name, description, sortOrder: index },
+      });
+    }
+
+    // Remove opções que saíram da lista, mas nunca uma que já esteja em uso.
+    const names = items.map(([name]) => name);
+    const obsolete = await prisma.subcategory.findMany({
+      where: { categoryId: category.id, name: { notIn: names } },
+      select: { id: true, name: true, _count: { select: { occurrences: true } } },
+    });
+    for (const item of obsolete) {
+      if (item._count.occurrences === 0) {
+        await prisma.subcategory.delete({ where: { id: item.id } });
+      } else {
+        console.warn(`Seed: subcategoria antiga "${item.name}" mantida (em uso).`);
+      }
+    }
+  }
 }
 
 /**

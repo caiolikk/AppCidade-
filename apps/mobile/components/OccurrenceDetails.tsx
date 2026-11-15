@@ -57,7 +57,12 @@ export function OccurrenceDetails({ occurrence, userPosition, onShowOnMap }: Occ
       <View style={styles.header}>
         <CategoryBadge name={occurrence.category.name} size={44} shape="rounded" backgroundColor={tint} />
         <View style={styles.headerText}>
-          <Text style={styles.category}>{occurrence.category.name}</Text>
+          <Text style={styles.category} numberOfLines={2}>
+            {/* Ocorrências antigas e a categoria "Outros" não têm subcategoria (D-022). */}
+            {occurrence.subcategory
+              ? `${occurrence.category.name} · ${occurrence.subcategory.name}`
+              : occurrence.category.name}
+          </Text>
           <Text style={styles.ago}>há {formatReportedAgo(occurrence.createdAt)}</Text>
         </View>
         <StatusPill status={occurrence.status} />

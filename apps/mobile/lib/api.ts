@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { getApiUrl } from "./config";
 import { clearToken, getToken } from "./session";
 
@@ -92,7 +93,24 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
 }
 
 export async function apiUploadImage(file: { uri: string; name: string; type: string }) {
+  return api<{ url: string; thumbnailUrl: string; publicId: string }>("/uploads/image", {
+    method: "POST",
+    body: await imageFormData(file),
+  });
+}
+
+/**
+ * Multipart com a imagem no campo "file" (fotos de ocorrência e foto de perfil). No
+ * Android/iOS o FormData aceita { uri, name, type }; no navegador isso vira "[object Object]",
+ * então lá a imagem (blob:/data: URI do seletor) é lida como Blob.
+ */
+export async function imageFormData(file: { uri: string; name: string; type: string }) {
   const body = new FormData();
+  if (Platform.OS === "web") {
+    const blob = await (await fetch(file.uri)).blob();
+    body.append("file", blob, file.name);
+    return body;
+  }
   body.append(
     "file",
     {
@@ -101,9 +119,5 @@ export async function apiUploadImage(file: { uri: string; name: string; type: st
       type: file.type,
     } as unknown as Blob,
   );
-
-  return api<{ url: string; thumbnailUrl: string; publicId: string }>("/uploads/image", {
-    method: "POST",
-    body,
-  });
+  return body;
 }

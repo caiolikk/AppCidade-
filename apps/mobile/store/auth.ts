@@ -9,6 +9,8 @@ type AuthState = {
   hydrating: boolean;
   hydrate: () => Promise<void>;
   applySession: (session: AuthResponse) => Promise<void>;
+  /** Atualiza o usuário depois de editar o perfil (a fonte da verdade continua sendo a API). */
+  setUser: (user: AuthUser) => void;
   logout: () => Promise<void>;
 };
 
@@ -42,6 +44,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   applySession: async (session) => {
     await setToken(session.accessToken);
     set({ token: session.accessToken, user: session.user });
+  },
+  setUser: (user) => {
+    set({ user });
   },
   logout: async () => {
     await clearToken();

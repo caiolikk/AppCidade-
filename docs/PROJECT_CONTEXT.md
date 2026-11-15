@@ -1,6 +1,6 @@
 ---
 tipo: contexto-essencial
-atualizado: 2026-11-13
+atualizado: 2026-11-14
 fonte: código em AppCidade- (commit 4f86468) + README + plans/
 ---
 
@@ -13,7 +13,7 @@ fonte: código em AppCidade- (commit 4f86468) + README + plans/
 - **O quê:** app mobile (Android/iOS) para cidadãos de **Santos/SP** reportarem e acompanharem ocorrências urbanas (infraestrutura, iluminação, trânsito, limpeza etc.) com foto, localização e categoria.
 - **Problema:** não existe um canal centralizado; as informações ficam dispersas; a gestão tem dificuldade de triar demandas; falta transparência para o cidadão.
 - **Público:** cidadãos de Santos (perfil `CITIZEN`) e gestores públicos (`MANAGER`/`ADMIN`).
-- **Diferenciais:** organização por bairro, mapa como tela central, validação comunitária, LGPD/minimização de dados.
+- **Diferenciais:** organização por bairro, mapa como tela central (é a tela inicial, D-023), validação comunitária, LGPD/minimização de dados.
 - **Equipe:** Ana (mobile), Caio (backend), Carlos (infra), Pamella. **Entrega: 26/nov/2026.**
 - Visão completa: `README.md`.
 
@@ -27,8 +27,9 @@ fonte: código em AppCidade- (commit 4f86468) + README + plans/
 6. Descrição com no máximo 500 caracteres; título entre 3 e 200.
 7. **7 status:** `REPORTADA → RECEBIDA → EM_ANALISE → EM_ATENDIMENTO → RESOLVIDA | ARQUIVADA | INVALIDA`. Toda troca gera `OccurrenceStatusHistory`. No app, as cores seguem os 4 estados do Figma (Em análise, Em andamento, Resolvido, Negado; `theme.ts → statusVisual`); o rótulo mostrado é o status real.
 8. Avaliação comunitária `UTIL | PERSISTE | INCORRETA`: **1 voto por usuário por ocorrência** (o segundo voto retorna 409).
+   **Reputação provisória (D-024):** 5 × (UTIL+PERSISTE) ÷ avaliações **recebidas** (sem o voto do próprio autor), 1 casa; sem avaliações → "Sem avaliações". Calculada só no backend (`modules/users/reputation.ts`).
 9. Coordenadas `Decimal(9,6)`; no PostGIS a ordem é **longitude, latitude**.
-10. **Categorias (D-019):** Infraestrutura, Limpeza, Segurança, Trânsito, Outros.
+10. **Categorias (D-019):** Infraestrutura, Limpeza, Segurança, Trânsito, Outros. **Subcategorias (D-022):** as opções do Figma, obrigatórias quando a categoria as tem (a categoria "Outros" não tem). Ocorrências antigas ficam sem subcategoria.
 
 ## 3. Stack
 
@@ -60,12 +61,14 @@ AppCidade-/
 │   ├── modules/geo/geofencing.ts   ST_Contains via $queryRaw
 │   ├── modules/occurrences/        CRUD público/admin, avaliações, status
 │   ├── modules/uploads/            POST /uploads/image (recriado em 2026-11-13, P-001)
+│   ├── modules/users/              perfil próprio (/me/profile, /me/occurrences, PATCH /me, avatar) + reputation.ts (D-024/D-025)
 │   ├── services/                   viacep, cloudinary, upload
 │   └── utils/                      jwt, password, digits, normalize-neighborhood, http-error
 ├── apps/mobile/
 │   ├── app/(auth)/                 login, register
-│   ├── app/(tabs)/                 index (feed), map, create, notifications, account
+│   ├── app/(tabs)/                 index (MAPA, tela inicial), nearby (perto de você), create, notifications, account
 │   ├── app/occurrence/[id].tsx     detalhe + voto
+│   ├── app/settings.tsx            configurações do perfil (foto, nome, CEP → bairro, sair)
 │   ├── components/ hooks/ lib/ store/   api.ts, session, auth store (Zustand)
 ├── prisma/                         schema.prisma, migrations/, seed.ts
 └── docker-compose.yml
@@ -77,9 +80,11 @@ AppCidade-/
 |---|---|---|
 | GET | `/health` | público |
 | POST | `/auth/register`, `/auth/login` | público |
-| GET | `/me` | autenticado |
+| GET | `/me` | autenticado (inclui `avatarUrl`) |
+| GET | `/me/profile` · `/me/occurrences?skip&take` | autenticado (só o próprio usuário, D-025) |
+| PATCH | `/me` (`name`, `cep`) · PUT/DELETE `/me/avatar` | autenticado (só o próprio usuário) |
 | GET | `/manager/health` · `/admin/health` | MANAGER+ · ADMIN |
-| GET | `/categories` | público |
+| GET | `/categories` | público (com `subcategories[]`) |
 | GET | `/occurrences` · `/occurrences/:id` | público (DTO sem dados pessoais) |
 | POST | `/occurrences` | autenticado (geofence só com a flag D-018) |
 | POST | `/occurrences/geofence-check` | autenticado (mantido; o app não usa mais) |
@@ -90,7 +95,7 @@ AppCidade-/
 
 ### Modelo de dados (`prisma/schema.prisma`)
 
-`User` (role, cpf, cep, neighborhood, santosNeighborhoodId, reputationScore) · `Category` · `Occurrence` (title, description, lat/lng, status) · `OccurrenceMedia` (url, thumbnailUrl, publicId) · `SantosNeighborhood` (geom `Polygon 4326` + índice GIST) · `Evaluation` (unique userId+occurrenceId) · `OccurrenceStatusHistory`. Uma única migration: `20260823224831_foundation`.
+`User` (role, cpf, cep, neighborhood, santosNeighborhoodId, `avatarUrl?`, `avatarPublicId?`, reputationScore **sem uso**) · `Category` · `Subcategory` (categoryId, name, description, sortOrder) · `Occurrence` (title, description, lat/lng, status, `subcategoryId?`) · `OccurrenceMedia` (url, thumbnailUrl, publicId) · `SantosNeighborhood` (geom `Polygon 4326` + índice GIST) · `Evaluation` (unique userId+occurrenceId) · `OccurrenceStatusHistory`. Migrations: `20260823224831_foundation`, `20261115003036_subcategories` e `20261115005535_user_avatar` (as duas últimas aditivas).
 
 ## 5. Estado das funcionalidades (conferido no código em 2026-11-14)
 
@@ -101,20 +106,22 @@ AppCidade-/
 | Geofencing PostGIS | Implementado, **desligado** | Flag `OCCURRENCE_GEOFENCE_ENABLED` (D-018). Seed tem só Gonzaga e Ponta da Praia (bboxes **aproximados**) |
 | Criar ocorrência (foto + local) | Implementado e testado (API + banco) | `(tabs)/create.tsx`: GPS **ou** ponto escolhido no mapa (`LocationPicker`); qualquer local. Ver [[ocorrencias-criacao-e-mapa]] |
 | Upload de imagem | Implementado | Local em `apps/api/uploads` ou Cloudinary |
-| Home "perto de mim" | Implementado (validado na web) | **Grade 3×N do Figma** com ilustração da categoria + título + distância (sem foto). Raio de 5 km (`lib/geo.ts`), por distância. Sem localização: todas, com aviso. D-021 |
-| Mapa | Implementado (validado na web; falta o aparelho) | **Todas** as ocorrências; pins estilo Waze **pré-renderizados** (`assets/pins`, `scripts/generate-pins.ps1`; P-013); usuário com precisão e direção (bússola); seguir/recentralizar. "Ver no mapa"/criação abrem `/map?focus=<id>&focusKey=<nonce>` (foco tem prioridade sobre seguir) |
+| Lista "perto de você" (`/nearby`) | Implementado (validado na web) | Acessada pela navbar (casa); **não** é mais a tela inicial (D-023). **Grade 3×N do Figma** com ilustração da categoria + título + distância (sem foto). Raio de 5 km (`lib/geo.ts`), por distância. Sem localização: todas, com aviso. D-021 |
+| Mapa (**tela inicial**, rota `/`) | Implementado (validado na web; falta o aparelho) | **Todas** as ocorrências; um marcador **por ocorrência** (sem agrupamento): **ícone da categoria** que diminui ao afastar (28–52 dp, z ≥ 12) e **bolinha do status** só bem afastado (z < 12); bitmaps de `scripts/generate-pins.ps1` (P-013, D-027; limites em `lib/map-markers.ts`); usuário com precisão e direção (bússola); seguir/recentralizar. "Ver no mapa"/criação abrem `/?focus=<id>&focusKey=<nonce>` (foco tem prioridade sobre seguir) |
 | Relação ocorrência → bairro | Não existe | O bairro só existe no usuário |
 | Detalhe + avaliação comunitária | Implementado | **Modal único** `OccurrenceDetailsModal`/`OccurrenceDetails` (Home e mapa) e rota `/occurrence/[id]`. Só 1 foto pública (`thumbnailUrl`) |
 | Mudança de status (API admin) | Implementado | Sem tela: não existe painel web nem tela de gestor |
+| Perfil "Minha Conta" + configurações | Implementado (API testada; web validada; falta o aparelho) | Figma 1:3343: foto, nome, "Membro desde", bairro; indicadores reais (ocorrências, avaliações **realizadas**, reputação D-024); "Minhas ocorrências" (10 + "Ver mais") → modal de detalhes. `app/settings.tsx`: foto, nome, CEP. Ver [[perfil-do-usuario]] |
 | Notificações | Placeholder | `PlaceholderScreen` |
-| Subcategoria, IA, push, Gov.br, reputação calculada | Não iniciado | Previstos no README |
+| Subcategorias | Implementado (API testada; UI validada na web) | Menu do Figma (`components/SubcategoryMenu.tsx`) ao tocar na categoria; persistida em `occurrences.subcategoryId` (D-022) |
+| IA, push, Gov.br, reputação definitiva | Não iniciado | Previstos no README (a reputação atual é provisória, D-024) |
 | Polígonos oficiais da Prefeitura | Não iniciado | |
 
 ## 6. Fluxos-chave (onde olhar no código)
 
 - **Cadastro:** `auth.service.ts` → `cep/resolve-address.ts` → `services/viacep.ts` (CEP de 8 dígitos, UF=SP, cidade=Santos, bairro normalizado) → busca `SantosNeighborhood.normalizedName`. Se não houver polígono, `santosNeighborhoodId = null`.
-- **Criar ocorrência:** GPS (`expo-location`) ou toque/arraste no `components/LocationPicker(.web).tsx` (6 casas) → foto → `POST /uploads/image` → `POST /occurrences` (Zod: título/descrição ≥3, lat ±90, lng ±180, categoria uuid, `media.min(1)`) → transação `occurrence + media + statusHistory(REPORTADA)` → app invalida `["occurrences"]` e abre `/map?focus=<id>`. Com a flag D-018 ligada, `geofencing.ts` volta a dar 403 fora / 422 sem polígono.
-- **Mapa:** `(tabs)/map.tsx` + `components/MapCanvas(.web).tsx` (pins, `focusId`, seguir/recentralizar) + `hooks/use-feed.ts` (React Query `["occurrences"]`, `GET /occurrences`). Localização: `hooks/use-user-location.ts` (só foreground, só com a aba em foco) e `hooks/use-device-heading.ts` (bússola suavizada).
+- **Criar ocorrência:** GPS (`expo-location`) ou toque/arraste no `components/LocationPicker(.web).tsx` (6 casas) → foto → `POST /uploads/image` → `POST /occurrences` (Zod: título/descrição ≥3, lat ±90, lng ±180, categoria uuid, subcategoria da categoria (D-022), `media.min(1)`) → transação `occurrence + media + statusHistory(REPORTADA)` → app invalida `["occurrences"]` e abre `/?focus=<id>`. Com a flag D-018 ligada, `geofencing.ts` volta a dar 403 fora / 422 sem polígono.
+- **Mapa (tela inicial):** `(tabs)/index.tsx` + `components/MapCanvas(.web).tsx` (pins, `focusId`, seguir/recentralizar) + `hooks/use-feed.ts` (React Query `["occurrences"]`, `GET /occurrences`). Localização: `hooks/use-user-location.ts` (só foreground, só com a aba em foco) e `hooks/use-device-heading.ts` (bússola suavizada).
 - **Detalhes:** Home e mapa → `components/OccurrenceDetailsModal.tsx` (lê o cache da lista, sem requisição extra) → `OccurrenceDetails.tsx` (também usado pela rota `/occurrence/[id]`).
 - **Seed:** cria categorias, bairros e staff; **remove** ocorrências fictícias (mídia `publicId seed-*`). Não cria mais ocorrências.
 
@@ -133,6 +140,7 @@ Guia completo: [[AMBIENTE_DEV]]. Resumo: `npm install` → `npm run db:up` (Dock
 | Fechamento da fundação / testes da API | [[cidade-plus-foundation-etapa-13]] |
 | Processo de segundo cérebro | [[segundo-cerebro-obsidian]] |
 | Interface / Figma / tokens visuais | [[interface-figma]] |
+| Perfil, reputação, configurações | [[perfil-do-usuario]] |
 | Ambiente, Docker, Expo/EAS, builds | [[AMBIENTE_DEV]] (guia) · [[ambiente-e-builds]] (plano) |
 | Modelos de plano e de prompt | [[_TEMPLATE]] · [[PROMPT_TEMPLATE]] |
 

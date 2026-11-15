@@ -40,6 +40,8 @@ export const createOccurrenceBodySchema = z.object({
   categoryId: z
     .string({ required_error: "Escolha uma categoria." })
     .uuid("Categoria inválida."),
+  // Opcional no schema; o service exige quando a categoria tem subcategorias (D-022).
+  subcategoryId: z.string().uuid("Subcategoria inválida.").optional(),
   media: z.array(mediaSchema).min(1, "A ocorrência precisa de pelo menos uma foto."),
 });
 

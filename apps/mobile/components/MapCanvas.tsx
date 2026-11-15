@@ -1,20 +1,18 @@
-import { useEffect, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
-import MapView, { Circle, Marker } from "react-native-maps";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
+import MapView, { Circle, Marker, type Region } from "react-native-maps";
 import type { UserPosition } from "../hooks/use-user-location";
-import { PIN_IMAGES } from "../lib/pin-images";
-import type { OccurrenceStatus, PublicOccurrence } from "../lib/types";
+import {
+  SELECTED_PIN_SIZE,
+  markerSize,
+  nextMarkerScale,
+  pinHeight,
+  zoomFromRegion,
+  type MarkerScale,
+} from "../lib/map-markers";
+import { MARKER_IMAGES } from "../lib/pin-images";
+import type { PublicOccurrence } from "../lib/types";
 import { colors, statusVisual, statusVisualColors } from "../theme";
-
-/** Bitmap pré-renderizado do pin (scripts/generate-pins.ps1) ou null se a categoria não tiver. */
-function pinImageFor(category: string, status: OccurrenceStatus, selected: boolean) {
-  const slug = category
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim();
-  return PIN_IMAGES[`${slug}/${statusVisual[status]}${selected ? "-sel" : ""}`] ?? null;
-}
 
 const SANTOS_REGION = {
   latitude: -23.9618,
@@ -25,6 +23,59 @@ const SANTOS_REGION = {
 
 /** Zoom de "rua" usado ao centralizar no usuário ou numa ocorrência. */
 const STREET_DELTA = 0.01;
+
+/** Durante o gesto, o zoom é reavaliado no máximo uma vez a cada X ms (o resto é descartado). */
+const REGION_THROTTLE_MS = 120;
+
+function categorySlug(name: string) {
+  return name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * `anchor` vale no Google Maps (Android); no Apple Maps (iOS) vale `centerOffset` (pontos).
+ * Pin com cauda: a ponta é a base do bitmap (altura lógica = `pinHeight(d)`, generate-pins.ps1).
+ */
+type MarkerLook = {
+  image: number | null;
+  anchor: { x: number; y: number };
+  centerOffset: { x: number; y: number };
+};
+
+const CENTER = { x: 0.5, y: 0.5 };
+const TAIL = { x: 0.5, y: 1 }; // ponta da cauda = coordenada exata
+const NO_OFFSET = { x: 0, y: 0 };
+const tailOffsets = new Map<number, { x: number; y: number }>();
+function tailOffset(diameter: number) {
+  let offset = tailOffsets.get(diameter);
+  if (!offset) {
+    offset = { x: 0, y: -pinHeight(diameter) / 2 };
+    tailOffsets.set(diameter, offset);
+  }
+  return offset;
+}
+
+/**
+ * Bitmap do marcador para o formato/tamanho atual (scripts/generate-pins.ps1, D-027):
+ * ícone da categoria (pin) na maior parte dos zooms, bolinha do status só bem afastado.
+ * O selecionado é sempre o pin grande. `image: null` = categoria sem ilustração (cai no pin
+ * nativo na cor do status).
+ */
+function markerLook(occurrence: PublicOccurrence, scale: MarkerScale, selected: boolean): MarkerLook {
+  const visual = statusVisual[occurrence.status];
+  const slug = categorySlug(occurrence.category.name);
+  if (selected) {
+    return { image: MARKER_IMAGES[`pin/${slug}/${visual}/sel`] ?? null, anchor: TAIL, centerOffset: tailOffset(SELECTED_PIN_SIZE) };
+  }
+  const size = markerSize(scale);
+  if (scale.level === "dot") {
+    return { image: MARKER_IMAGES[`dot/${visual}/${size}`] ?? null, anchor: CENTER, centerOffset: NO_OFFSET };
+  }
+  return { image: MARKER_IMAGES[`pin/${slug}/${visual}/${size}`] ?? null, anchor: TAIL, centerOffset: tailOffset(size) };
+}
 
 type MapCanvasProps = {
   occurrences: PublicOccurrence[];
@@ -64,6 +115,53 @@ export function MapCanvas({
   const zoomedToUser = useRef(false);
   // Animações de câmera antes do onMapReady são descartadas pelo mapa nativo.
   const [mapReady, setMapReady] = useState(false);
+
+  // --- Zoom → formato/tamanho (D-027) ---------------------------------------------------
+  const screen = useWindowDimensions();
+  const [mapWidth, setMapWidth] = useState(screen.width);
+  const [scale, setScale] = useState<MarkerScale>(() =>
+    nextMarkerScale(zoomFromRegion(SANTOS_REGION.longitudeDelta, screen.width)),
+  );
+  const scaleRef = useRef(scale);
+  const lastRegionRun = useRef(0);
+
+  /** Só muda estado quando o formato ou o degrau de tamanho mudam (o pan não custa nada). */
+  const applyRegion = useCallback(
+    (region: Region) => {
+      const next = nextMarkerScale(zoomFromRegion(region.longitudeDelta, mapWidth), scaleRef.current);
+      if (next.level !== scaleRef.current.level || next.step !== scaleRef.current.step) {
+        scaleRef.current = next;
+        setScale(next);
+      }
+    },
+    [mapWidth],
+  );
+
+  const onRegionChange = useCallback(
+    (region: Region) => {
+      const now = Date.now();
+      if (now - lastRegionRun.current < REGION_THROTTLE_MS) return;
+      lastRegionRun.current = now;
+      applyRegion(region);
+    },
+    [applyRegion],
+  );
+
+  // Um marcador por ocorrência, SEM agrupamento (D-027). Ordem por data: em sobreposição, a
+  // mais recente fica por cima. O selecionado é desenhado à parte, acima de todos.
+  const ordered = useMemo(
+    () =>
+      occurrences
+        .filter((item) => item.id !== selectedId)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    [occurrences, selectedId],
+  );
+  const selected = selectedId ? occurrences.find((item) => item.id === selectedId) ?? null : null;
+
+  // Callback estável para os marcadores memoizados não re-renderizarem à toa.
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+  const selectById = useCallback((id: string) => onSelectRef.current(id), []);
 
   // Centraliza na ocorrência em foco. Cada pedido (id + focusKey) anima uma vez,
   // só depois de o mapa estar pronto e a ocorrência estar na lista.
@@ -113,79 +211,92 @@ export function MapCanvas({
   }, [following, userPosition?.latitude, userPosition?.longitude, recenterKey, mapReady]);
 
   return (
-    <MapView
-      ref={mapRef}
-      style={StyleSheet.absoluteFill}
-      initialRegion={SANTOS_REGION}
-      onMapReady={() => setMapReady(true)}
-      onPanDrag={onUserGesture}
-      showsCompass={false}
-      toolbarEnabled={false}
-    >
-      {userPosition?.accuracy && userPosition.accuracy < 500 ? (
-        <Circle
-          center={userPosition}
-          radius={userPosition.accuracy}
-          fillColor="rgba(13,58,159,0.12)"
-          strokeColor="rgba(13,58,159,0.35)"
-          strokeWidth={1}
-          zIndex={1}
-        />
-      ) : null}
+    <View style={StyleSheet.absoluteFill} onLayout={(event) => setMapWidth(event.nativeEvent.layout.width)}>
+      <MapView
+        ref={mapRef}
+        style={StyleSheet.absoluteFill}
+        initialRegion={SANTOS_REGION}
+        onMapReady={() => setMapReady(true)}
+        onPanDrag={onUserGesture}
+        onRegionChange={onRegionChange}
+        onRegionChangeComplete={applyRegion}
+        showsCompass={false}
+        toolbarEnabled={false}
+      >
+        {userPosition?.accuracy && userPosition.accuracy < 500 ? (
+          <Circle
+            center={userPosition}
+            radius={userPosition.accuracy}
+            fillColor="rgba(13,58,159,0.12)"
+            strokeColor="rgba(13,58,159,0.35)"
+            strokeWidth={1}
+            zIndex={1}
+          />
+        ) : null}
 
-      {occurrences.map((item) => (
-        <OccurrencePin
-          key={item.id}
-          occurrence={item}
-          selected={selectedId === item.id}
-          onPress={() => onSelect(item.id)}
-        />
-      ))}
+        {ordered.map((occurrence) => (
+          <OccurrenceMarker
+            key={occurrence.id}
+            occurrence={occurrence}
+            look={markerLook(occurrence, scale, false)}
+            selected={false}
+            onSelect={selectById}
+          />
+        ))}
 
-      {userPosition ? (
-        <UserLocationMarker position={userPosition} direction={userDirection} />
-      ) : null}
-    </MapView>
+        {selected ? (
+          <OccurrenceMarker
+            key={`selected:${selected.id}`}
+            occurrence={selected}
+            look={markerLook(selected, scale, true)}
+            selected
+            onSelect={selectById}
+          />
+        ) : null}
+
+        {userPosition ? (
+          <UserLocationMarker position={userPosition} direction={userDirection} />
+        ) : null}
+      </MapView>
+
+    </View>
   );
 }
 
 /**
- * Pin estilo Waze (referência do usuário), com a identidade do Cidade+: anel na cor do status
- * (linguagem das bolinhas do Figma), ilustração da categoria e cauda apontando para o local.
- *
- * Usa BITMAP pré-renderizado (`image`), e não uma View filha: no Android o react-native-maps
- * transforma Views filhas em snapshot, e o snapshot saía do tamanho errado (pin cortado, só o
- * quadrante superior esquerdo). Com `image` o desenho é nativo, inteiro e com a densidade
- * certa (@2x/@3x). A ponta da cauda é a base do bitmap → anchor (0.5, 1) = coordenada exata.
+ * Marcador de UMA ocorrência (identificada pelo id real). Usa BITMAP (`image`), e não uma
+ * View filha: no Android o snapshot de View saía cortado (P-013). Memoizado: só re-renderiza
+ * quando a aparência (bitmap) ou a ocorrência mudam — ou seja, quando muda o degrau de zoom.
  */
-function OccurrencePin({
+const OccurrenceMarker = memo(function OccurrenceMarker({
   occurrence,
+  look,
   selected,
-  onPress,
+  onSelect,
 }: {
   occurrence: PublicOccurrence;
+  look: MarkerLook;
   selected: boolean;
-  onPress: () => void;
+  onSelect: (id: string) => void;
 }) {
-  const image = pinImageFor(occurrence.category.name, occurrence.status, selected);
   const coordinate = {
     latitude: Number(occurrence.latitude),
     longitude: Number(occurrence.longitude),
   };
   const handlePress = (event: { stopPropagation?: () => void }) => {
     event.stopPropagation?.();
-    onPress();
+    onSelect(occurrence.id);
   };
   const label = `${occurrence.category.name}: ${occurrence.title}`;
 
-  if (!image) {
+  if (!look.image) {
     // Categoria sem ilustração: pin nativo na cor do status (nenhuma fica sem marcador).
     return (
       <Marker
         coordinate={coordinate}
         pinColor={statusVisualColors[statusVisual[occurrence.status]].dot}
         onPress={handlePress}
-        zIndex={selected ? 20 : 10}
+        zIndex={selected ? 40 : 10}
         accessibilityLabel={label}
       />
     );
@@ -194,13 +305,26 @@ function OccurrencePin({
   return (
     <Marker
       coordinate={coordinate}
-      image={image}
-      anchor={{ x: 0.5, y: 1 }}
+      image={look.image}
+      anchor={look.anchor}
+      centerOffset={look.centerOffset}
       tracksViewChanges={false}
       onPress={handlePress}
-      zIndex={selected ? 20 : 10}
+      zIndex={selected ? 40 : 10}
       accessibilityLabel={label}
     />
+  );
+}, sameMarker);
+
+function sameMarker(
+  a: { occurrence: PublicOccurrence; look: MarkerLook; selected: boolean },
+  b: { occurrence: PublicOccurrence; look: MarkerLook; selected: boolean },
+) {
+  return (
+    a.occurrence === b.occurrence &&
+    a.selected === b.selected &&
+    a.look.image === b.look.image &&
+    a.look.anchor === b.look.anchor
   );
 }
 

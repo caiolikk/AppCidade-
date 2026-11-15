@@ -1,0 +1,9 @@
+# O que `railway up` NUNCA deve enviar do computador (plano hospedagem-e-deploy).
+# Reforça o .gitignore: segredos, dependências locais e fotos do disco de desenvolvimento.
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+apps/api/uploads
+.git

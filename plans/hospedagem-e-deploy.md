@@ -686,3 +686,50 @@ Os nomes exatos dos campos do painel podem variar um pouco. O que importa são o
 - Refresh token (sessão de 15 min).
 - `expo-updates` + EAS Workflows.
 - Painel admin web (`apps/admin`, site estático).
+
+### Execução do roteiro (2026-11-15)
+- **Neon:**
+  - CLI `neon` 9.5.0 instalada e login na organização **CidadePlus** (`org-muddy-forest-87126061`, plano Free).
+  - Plugin `neon-postgres` instalado no Claude Code.
+  - Projeto **`cidade-plus`** (`weathered-tree-07938379`): `aws-us-east-1`, Postgres 16, banco `cidade_plus`.
+  - `prisma migrate deploy` aplicou as 3 migrations; **PostGIS 3.3.10** confirmado em `pg_extension`.
+  - A string de conexão não foi exibida nem gravada: é obtida na hora com `neon connection-string --project-id weathered-tree-07938379 --database-name cidade_plus` (direta, `sslmode=require`; acrescentar `connect_timeout=15`).
+- **Cloudinary:** conta `pijoo54k` criada; credenciais validadas (ping 200).
+  - **Recomendado gerar um novo API secret:** o atual circulou no chat.
+  - Nenhuma credencial foi gravada em arquivo.
+- **Bloqueio:** o repositório é pessoal (`caiolikk`). Só o dono instala o app do Railway no GitHub e cadastra os Secrets/proteção da `main`.
+  - **Alternativa enquanto isso:** deploy pela CLI do Railway (`railway up`), sem o app do GitHub.
+  - **Recomendado:** mover o repositório para uma organização do projeto.
+- **Seed de produção feito:** 5 categorias, 23 subcategorias, 2 bairros e as contas admin/gestor com senhas fortes geradas, gravadas **só** num arquivo local do usuário, fora do repositório, para ir ao gerenciador de senhas e ser apagado. Senhas conferidas com bcrypt.
+- **Railway (feito via CLI, sem o app do GitHub):**
+  - CLI `railway` 5.74.0; login na conta CidadePlus.
+  - Projeto `cidade-plus` (`0b84a6f6-…`), serviço `api`, ambiente `production`.
+  - **Variáveis:**
+    - `NODE_ENV`, `JWT_EXPIRES_IN`, `OCCURRENCE_GEOFENCE_ENABLED`;
+    - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`;
+    - `RAILWAY_DOCKERFILE_PATH=apps/api/Dockerfile`;
+    - segredos via `--stdin`: `DATABASE_URL` (Neon direta + `connect_timeout=15`), `JWT_SECRET` (gerado, nunca exibido) e `CLOUDINARY_API_SECRET`.
+    - **Sem `SEED_*`:** o seed roda fora do Railway.
+  - **Configuração do serviço** (`railway api`, mutation `serviceInstanceUpdate`):
+    - `dockerfilePath`;
+    - `preDeployCommand ["npx prisma migrate deploy"]`;
+    - `healthcheckPath /health/ready` (120 s);
+    - `restartPolicy ON_FAILURE` (5).
+  - **Região:** `iad` (Virginia), que já era a padrão.
+    - **Erro 1:** `railway service scale us-east4-eqdc4a=1` *acrescentou* uma 2ª região, e o Hobby recusou ("Your plan can only deploy to a single region").
+    - **Correção:** `scale us-east4-eqdc4a=0`, depois um novo `railway up`.
+  - **Erro 2:** o 1º `railway up --ci` ficou parado mais de 10 min sem criar implantação (saída filtrada por pipe, motivo não visto).
+    - **Solução:** `railway up --detach` + acompanhar por `railway logs --build <id>` e pela API.
+  - `.railwayignore` novo (reforça o `.gitignore`: `.env`, `node_modules`, `uploads`, `dist`, `.git`).
+  - **Deploy `15fe300a…`: SUCCESS.**
+    - pre-deploy "No pending migrations";
+    - API na porta 8080 (`PORT` injetada);
+    - health check 200.
+  - **URL pública:** **https://api-production-93485227.up.railway.app**
+    - `/health` 200; `/health/ready` 200 (~150 ms a partir de Santos);
+    - `/categories` 5 categorias/23 subcategorias; `/occurrences` vazio;
+    - HTTP → 301 HTTPS.
+  - **Deploys futuros, até ligar o GitHub:** `railway up -s api --detach` na raiz do repositório (envia a cópia local, inclusive o que não foi commitado).
+- **Pendente:**
+  - EAS;
+  - teste ponta a ponta.

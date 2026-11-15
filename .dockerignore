@@ -1,0 +1,16 @@
+# Contexto do build da API (apps/api/Dockerfile, contexto = raiz do monorepo).
+# Nunca enviar segredos, dependências locais nem as fotos do disco de desenvolvimento.
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.github
+apps/api/uploads
+# Do app mobile só o package.json entra (o npm valida o lockfile do workspace).
+apps/mobile/*
+!apps/mobile/package.json
+docs
+plans
+*.log

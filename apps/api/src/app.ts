@@ -5,6 +5,7 @@ import { mkdir } from "node:fs/promises";
 import Fastify from "fastify";
 import { ZodError } from "zod";
 import { env } from "./config/env.js";
+import { prisma } from "./lib/prisma.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
 import { categoryRoutes } from "./modules/categories/category.routes.js";
 import { occurrenceRoutes } from "./modules/occurrences/occurrence.routes.js";
@@ -62,9 +63,22 @@ export async function buildApp() {
     return reply.status(500).send({ message: "Erro interno." });
   });
 
+  // Vivacidade: o processo responde (não toca no banco).
   app.get("/health", async () => ({
     status: "ok",
   }));
+
+  // Prontidão: a API consegue falar com o banco. É o health check do deploy (plano
+  // hospedagem-e-deploy): uma versão nova sem banco não entra no ar.
+  app.get("/health/ready", async (_request, reply) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return { status: "ok", database: "ok" };
+    } catch (error) {
+      app.log.error({ err: error }, "Banco indisponível no /health/ready");
+      return reply.status(503).send({ status: "error", database: "unavailable" });
+    }
+  });
 
   await app.register(authRoutes);
   await app.register(categoryRoutes);

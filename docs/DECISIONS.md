@@ -203,3 +203,28 @@ Origem: [[ocorrencias-criacao-e-mapa]].
 - **Custo:** 344 PNGs (3,9 MB), de `scripts/generate-pins.ps1`.
 
 Origem: [[ocorrencias-criacao-e-mapa]].
+
+## D-028 — Hospedagem inicial: Railway (API em Docker) + Neon (Postgres/PostGIS) + Cloudinary, mesma região (US East)
+**Data:** 2026-11-15 · **Status:** Vigente (código pronto; contas a configurar)
+- **Por quê:** custo de ~US$ 5/mês, sem servidor para administrar, HTTPS automático e deploy pelo GitHub. Neon e Cloudinary no plano gratuito. **PostGIS confirmado** na documentação do Neon.
+- **Descartados:**
+  - Bem-vindo.net: hospedagem de sites, sem Node/PostGIS;
+  - Render free: dorme e o Postgres expira em 30 dias;
+  - Supabase free: pausa em 7 dias;
+  - VPS: administração;
+  - AWS: custo fixo e complexidade.
+- **Mesma região:** o Railway não tem região no Brasil, então o Neon fica em `aws-us-east-1` junto com a API (Railway US East). Banco no Brasil + API nos EUA multiplicaria a latência por consulta.
+- **Portabilidade:**
+  - build num **Dockerfile** (`apps/api/Dockerfile`), não em config proprietária. O `railway.json` foi descontinuado para serviços novos e para de funcionar em 2026-12-01;
+  - configuração só por variáveis;
+  - Postgres padrão;
+  - domínio próprio recomendado para a URL da API.
+- **Regras de produção no código:**
+  - `PORT` tem prioridade sobre `API_PORT`;
+  - sem Cloudinary a API não sobe (salvo `UPLOADS_LOCAL_IN_PRODUCTION=true`);
+  - o seed exige senhas fortes;
+  - o health check do deploy é `/health/ready` (banco);
+  - migrations só pelo pre-deploy (`prisma migrate deploy`).
+- **Conexão Neon:** a direta (sem pooler), porque a API é um processo único; evita `directUrl` no schema.
+- **CI/backup:** GitHub Actions (`ci.yml` com PostGIS de serviço; `backup-db.yml` com dump criptografado).
+Origem: [[hospedagem-e-deploy]].

@@ -69,7 +69,28 @@ async function upsertStaff(input: {
   });
 }
 
+/**
+ * Em produção, nunca criar admin/gestor com as senhas padrão de desenvolvimento (plano
+ * hospedagem-e-deploy). Atenção: cada execução do seed REGRAVA a senha dessas contas com
+ * os valores de SEED_*.
+ */
+function assertProductionSeedPasswords() {
+  if (process.env.NODE_ENV !== "production") {
+    return;
+  }
+  const missing = ["SEED_ADMIN_PASSWORD", "SEED_MANAGER_PASSWORD"].filter(
+    (name) => (process.env[name] ?? "").length < 12,
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `Seed em produção exige senhas fortes (12+ caracteres) em: ${missing.join(", ")}.`,
+    );
+  }
+}
+
 async function main() {
+  assertProductionSeedPasswords();
+
   await upsertNeighborhood({
     id: GONZAGA_ID,
     name: "Gonzaga",

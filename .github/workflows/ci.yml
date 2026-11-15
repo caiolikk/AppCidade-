@@ -1,0 +1,77 @@
+# CI do Cidade+ (plano hospedagem-e-deploy). Roda em PRs e pushes para main/develop.
+# O deploy da API NÃO acontece aqui: o Railway publica a main sozinho, esperando este CI
+# passar (opção "Wait for CI" do serviço). Nenhum segredo de produção é usado neste job.
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Typecheck e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        # Mesma imagem do docker-compose de desenvolvimento (PostGIS é obrigatório).
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: cidade
+          POSTGRES_PASSWORD: cidade
+          POSTGRES_DB: cidade_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cidade -d cidade_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # Banco descartável do próprio job; valores fictícios, válidos só aqui.
+      DATABASE_URL: postgresql://cidade:cidade@localhost:5432/cidade_test?schema=public
+      JWT_SECRET: ci-somente-teste-nao-usar-em-producao
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck (API + mobile)
+        run: npm run typecheck
+
+      - name: Testes puros do app (marcadores do mapa)
+        run: npx vitest run apps/mobile/lib
+
+      - name: Migrations no banco de teste
+        run: npx prisma migrate deploy
+
+      - name: Seed (categorias, bairros e contas de teste)
+        run: npm run db:seed
+
+      - name: Testes de integração da API
+        run: npm test
+
+  docker:
+    name: Build da imagem da API
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker build (só verifica; não publica)
+        run: docker build -f apps/api/Dockerfile -t cidade-plus-api:ci .

@@ -41,6 +41,7 @@ fonte: código em AppCidade- (commit 4f86468) + README + plans/
 | Banco | PostgreSQL 16 + **PostGIS 3.4** (Docker `postgis/postgis:16-3.4`) · **Prisma 6.14** (schema na raiz) |
 | Imagens | Cloudinary se `CLOUDINARY_*` existir; caso contrário, disco local `apps/api/uploads` servido em `/media` |
 | Testes | Vitest na API (`npm test`, exige o Postgres no ar) |
+| Hospedagem (D-028) | **Planejada, código pronto:** API em Docker (`apps/api/Dockerfile`) no **Railway US East** + **Neon** (Postgres 16/PostGIS, `aws-us-east-1`) + **Cloudinary**; CI e backup em `.github/workflows/`. Contas ainda não criadas. Ver [[hospedagem-e-deploy]] |
 | Build mobile | **Development build** (`expo-dev-client`) via **EAS** (`apps/mobile/eas.json`); Expo Go só como fallback; id `com.cidadeplus.app`. Ver [[AMBIENTE_DEV]] |
 
 As justificativas ficam em [[DECISIONS]].
@@ -78,7 +79,7 @@ AppCidade-/
 
 | Método | Rota | Acesso |
 |---|---|---|
-| GET | `/health` | público |
+| GET | `/health` (processo) · `/health/ready` (banco; health check do deploy) | público |
 | POST | `/auth/register`, `/auth/login` | público |
 | GET | `/me` | autenticado (inclui `avatarUrl`) |
 | GET | `/me/profile` · `/me/occurrences?skip&take` | autenticado (só o próprio usuário, D-025) |
@@ -128,6 +129,8 @@ AppCidade-/
 ## 7. Como rodar
 
 Guia completo: [[AMBIENTE_DEV]]. Resumo: `npm install` → `npm run db:up` (Docker roda **só o Postgres**) → `npx prisma migrate deploy` → `npm run db:seed` → `npm run dev:api` (porta 3333) → `npm run dev:mobile` (Metro em modo dev build). Variáveis do app ficam em `apps/mobile/.env`, não na raiz. Nunca copie o `.env` para a documentação.
+
+**Produção:** roteiro completo (contas, variáveis, seed, EAS, backup) em [[hospedagem-e-deploy]]. Regras: `NODE_ENV=production` exige Cloudinary e `SEED_*` fortes; migrations só via `prisma migrate deploy` (pre-deploy).
 
 ## 8. Mapa de documentos
 

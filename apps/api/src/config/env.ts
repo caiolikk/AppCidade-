@@ -28,6 +28,32 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
+  /**
+   * Produção sem Cloudinary grava fotos no disco local, que na maioria das plataformas é
+   * apagado a cada deploy. Só use "true" com disco persistente (VPS ou volume). Plano
+   * hospedagem-e-deploy.
+   */
+  UPLOADS_LOCAL_IN_PRODUCTION: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
 });
 
-export const env = envSchema.parse(process.env);
+// Plataformas (Railway, Render, Fly...) informam a porta em PORT; localmente vale API_PORT.
+const parsed = envSchema.parse({
+  ...process.env,
+  API_PORT: process.env.PORT ?? process.env.API_PORT,
+});
+
+const hasCloudinary = Boolean(
+  parsed.CLOUDINARY_CLOUD_NAME && parsed.CLOUDINARY_API_KEY && parsed.CLOUDINARY_API_SECRET,
+);
+
+if (parsed.NODE_ENV === "production" && !hasCloudinary && !parsed.UPLOADS_LOCAL_IN_PRODUCTION) {
+  throw new Error(
+    "Produção sem Cloudinary: configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY e " +
+      "CLOUDINARY_API_SECRET (ou UPLOADS_LOCAL_IN_PRODUCTION=true se o disco for persistente).",
+  );
+}
+
+export const env = parsed;

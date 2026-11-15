@@ -81,6 +81,12 @@ describe("fundação Cidade+", () => {
     expect(result.body.status).toBe("ok");
   });
 
+  it("GET /health/ready confirma o banco (health check do deploy)", async () => {
+    const result = await request("GET", "/health/ready");
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ status: "ok", database: "ok" });
+  });
+
   it("recusa CEP fora de Santos", async () => {
     const result = await request("POST", "/auth/register", {
       body: {

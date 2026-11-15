@@ -1,0 +1,66 @@
+# Backup do banco de produção (plano hospedagem-e-deploy).
+# Semanal (segunda, 03:00 de Brasília) e manual (Actions → "Backup do banco" → Run workflow).
+#
+# Segredos necessários (Settings → Secrets and variables → Actions):
+#   PROD_DATABASE_URL   string de conexão DIRETA do Neon (sem "-pooler"), com sslmode=require
+#   BACKUP_PASSPHRASE   senha longa para criptografar o dump (guarde-a fora do GitHub também)
+# Sem eles, o job só avisa e termina.
+#
+# O dump contém dados pessoais (CPF, e-mail): por isso é CRIPTOGRAFADO antes de virar
+# artefato (artefatos de repositório público podem ser baixados por terceiros).
+#
+# Restaurar (localmente, num banco descartável primeiro):
+#   gpg --decrypt cidade-plus-AAAAMMDD-HHMMSS.dump.gpg > backup.dump
+#   pg_restore --no-owner --no-privileges -d "<url do banco de destino>" backup.dump
+name: Backup do banco
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Conferir segredos
+        id: check
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::warning::PROD_DATABASE_URL ou BACKUP_PASSPHRASE não configurados; backup ignorado."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: pg_dump (cliente PostgreSQL 16) + criptografia
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%d-%H%M%S)"
+          echo "STAMP=$stamp" >> "$GITHUB_ENV"
+          docker run --rm -e DATABASE_URL postgres:16 \
+            sh -c 'pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL"' \
+            > backup.dump
+          test -s backup.dump
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 \
+            --output "cidade-plus-$stamp.dump.gpg" backup.dump <<< "$BACKUP_PASSPHRASE"
+          rm -f backup.dump
+          ls -lh "cidade-plus-$stamp.dump.gpg"
+
+      - name: Guardar como artefato (30 dias)
+        if: steps.check.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cidade-plus-db-${{ env.STAMP }}
+          path: cidade-plus-${{ env.STAMP }}.dump.gpg
+          retention-days: 30
+          if-no-files-found: error

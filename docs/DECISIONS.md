@@ -52,7 +52,7 @@ Origem: audit §11 e §21.
 A subcategoria está prevista no README, mas foi adiada. A IA é uma evolução.
 
 ## D-010 — JWT curto (~15 min) sem refresh token
-**Data:** 2026-08 · **Status:** Vigente
+**Data:** 2026-08 · **Status:** **Substituída por D-033** (2026-11-18): o JWT continua curto, mas agora há refresh token
 A arquitetura fica compatível com um refresh token futuro.
 
 ## D-011 — Cloudinary com fallback em disco local
@@ -323,4 +323,23 @@ Origem: [[ocorrencias-criacao-e-mapa]].
   - remoção livre em qualquer status (apagaria o registro de um atendimento em curso);
   - expor `authorId` no DTO público.
 Origem: [[ocorrencias-edicao-e-remocao]].
+
+## D-033 — Sessão longa no app: access token de 15 min + refresh token rotativo de 60 dias
+**Data:** 2026-11-18 · **Status:** Vigente (API e cliente testados; falta o aparelho) · substitui D-010
+- **Problema:** com o JWT de 15 minutos e sem renovação, o primeiro 401 deslogava. O cidadão que parava de usar o app por alguns minutos tinha de entrar de novo, inclusive na hora de registrar uma ocorrência na rua.
+- **Solução:**
+  - o **access token continua JWT de 15 min** (`JWT_EXPIRES_IN`);
+  - o login e o cadastro passam a devolver também um **refresh token opaco** (32 bytes aleatórios). No banco fica **só o hash SHA-256** (tabela `refresh_tokens`, migration aditiva `20261118231823_refresh_tokens`).
+- **Validade deslizante de 60 dias** (`REFRESH_TOKEN_TTL_DAYS`):
+  - `POST /auth/refresh` troca o token por um novo par e **revoga o usado** (rotação);
+  - quem abre o app ao menos uma vez a cada 60 dias não precisa entrar de novo.
+- **Tolerância de 60 s** para reusar um token recém-rotacionado, caso a resposta se perca com a rede ruim. Fora disso, um token revogado, vencido ou desconhecido → 401.
+- **Logout:** `POST /auth/logout` (204, idempotente, sem exigir o access token) revoga no servidor. As linhas antigas do usuário são limpas na renovação e no logout.
+- **Cliente** (`lib/api.ts`):
+  - no 401 de rota autenticada fora de `/auth/*`, renova **uma vez**, com uma única renovação em voo, e repete a requisição;
+  - **sem rede na renovação, não desloga** (mostra o erro de conexão); só desloga se o refresh for recusado.
+  - Os dois tokens ficam no SecureStore.
+- **Alternativa descartada:** JWT de 30 a 90 dias. Um token vazado valeria por meses e o logout não o invalidaria.
+- **Compatibilidade:** quem já está logado com a versão antiga (sem refresh token) entra uma última vez; depois, a sessão é longa.
+Origem: [[autenticacao-e-sessao]].
 

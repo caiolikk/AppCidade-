@@ -80,7 +80,7 @@ AppCidade-/
 | Método | Rota | Acesso |
 |---|---|---|
 | GET | `/health` (processo) · `/health/ready` (banco; health check do deploy) | público |
-| POST | `/auth/register`, `/auth/login` | público |
+| POST | `/auth/register`, `/auth/login` (devolvem `accessToken` + `refreshToken`) · `/auth/refresh` (novo par, rotação) · `/auth/logout` (revoga) | público (D-033) |
 | GET | `/me` | autenticado (inclui `avatarUrl`) |
 | GET | `/me/profile` · `/me/occurrences?skip&take` | autenticado (só o próprio usuário, D-025) |
 | PATCH | `/me` (`name`, `cep`) · PUT/DELETE `/me/avatar` | autenticado (só o próprio usuário) |
@@ -97,13 +97,13 @@ AppCidade-/
 
 ### Modelo de dados (`prisma/schema.prisma`)
 
-`User` (role, cpf, cep, neighborhood, santosNeighborhoodId, `avatarUrl?`, `avatarPublicId?`, reputationScore **sem uso**) · `Category` · `Subcategory` (categoryId, name, description, sortOrder) · `Occurrence` (title, description, lat/lng, status, `subcategoryId?`, `deletedAt?` = removida pelo autor, D-032) · `OccurrenceMedia` (url, thumbnailUrl, publicId) · `SantosNeighborhood` (geom `Polygon 4326` + índice GIST) · `Evaluation` (unique userId+occurrenceId) · `OccurrenceStatusHistory`. Migrations: `20260823224831_foundation`, `20261115003036_subcategories` `20261115005535_user_avatar` e `20261118020421_occurrence_soft_delete` (todas depois da primeira são aditivas).
+`User` (role, cpf, cep, neighborhood, santosNeighborhoodId, `avatarUrl?`, `avatarPublicId?`, reputationScore **sem uso**) · `Category` · `Subcategory` (categoryId, name, description, sortOrder) · `Occurrence` (title, description, lat/lng, status, `subcategoryId?`, `deletedAt?` = removida pelo autor, D-032) · `OccurrenceMedia` (url, thumbnailUrl, publicId) · `SantosNeighborhood` (geom `Polygon 4326` + índice GIST) · `Evaluation` (unique userId+occurrenceId) · `OccurrenceStatusHistory` · `RefreshToken` (só o hash; D-033). Migrations: `20260823224831_foundation`, `20261115003036_subcategories` `20261115005535_user_avatar` e `20261118020421_occurrence_soft_delete` e `20261118231823_refresh_tokens` (todas depois da primeira são aditivas).
 
 ## 5. Estado das funcionalidades (conferido no código em 2026-11-14)
 
 | Funcionalidade | Estado | Observação |
 |---|---|---|
-| Cadastro/login JWT + RBAC | Implementado | Sem refresh token |
+| Cadastro/login JWT + RBAC | Implementado | Sessão longa (D-033): access 15 min + refresh rotativo de 60 dias, renovado sozinho pelo app. Ver [[autenticacao-e-sessao]] |
 | CEP → bairro (ViaCEP) | Implementado | Só SP/Santos |
 | Geofencing PostGIS | Implementado, **desligado** | Flag `OCCURRENCE_GEOFENCE_ENABLED` (D-018). Seed tem só Gonzaga e Ponta da Praia (bboxes **aproximados**) |
 | Criar ocorrência (foto + local) | Implementado e testado (API + banco) | `(tabs)/create.tsx`: GPS **ou** ponto escolhido no mapa (`LocationPicker`); qualquer local. Ver [[ocorrencias-criacao-e-mapa]] |

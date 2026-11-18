@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 import { getApiUrl } from "./config";
-import { clearToken, getToken } from "./session";
+import { clearToken, getRefreshToken, getToken, setSessionTokens } from "./session";
 
 export class ApiError extends Error {
   status: number;
@@ -17,6 +17,8 @@ type ApiOptions = {
   body?: unknown;
   token?: string | null;
   auth?: boolean;
+  /** Interno: já é a repetição depois de renovar a sessão (não renova de novo). */
+  retried?: boolean;
 };
 
 function isFormData(value: unknown): value is FormData {
@@ -27,6 +29,45 @@ let onUnauthorized: (() => void) | null = null;
 
 export function setUnauthorizedHandler(handler: (() => void) | null) {
   onUnauthorized = handler;
+}
+
+type RefreshResult = "ok" | "invalid" | "offline";
+let refreshing: Promise<RefreshResult> | null = null;
+
+/**
+ * Renova a sessão com o refresh token (D-033). Uma única renovação em voo: várias
+ * requisições que recebem 401 ao mesmo tempo esperam a mesma. "offline" (sem rede ou API
+ * fora) NÃO desloga — só "invalid" (refresh vencido/revogado) desloga.
+ */
+function refreshSession(): Promise<RefreshResult> {
+  if (!refreshing) {
+    refreshing = (async (): Promise<RefreshResult> => {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) return "invalid";
+      let response: Response;
+      try {
+        response = await fetch(`${getApiUrl()}/auth/refresh`, {
+          method: "POST",
+          headers: { Accept: "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken }),
+        });
+      } catch {
+        return "offline";
+      }
+      if (response.status === 401 || response.status === 400) return "invalid";
+      if (!response.ok) return "offline";
+      try {
+        const session = (await response.json()) as { accessToken: string; refreshToken: string };
+        await setSessionTokens(session.accessToken, session.refreshToken);
+        return "ok";
+      } catch {
+        return "offline";
+      }
+    })().finally(() => {
+      refreshing = null;
+    });
+  }
+  return refreshing;
 }
 
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
@@ -69,7 +110,26 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
     }
   }
 
-  if (response.status === 401 && options.auth !== false) {
+  // Access token vencido (15 min): renova a sessão e repete uma vez, sem o usuário perceber.
+  // Rotas /auth/* (login, cadastro) devolvem 401 por senha errada: essas não renovam.
+  if (
+    response.status === 401 &&
+    options.auth !== false &&
+    !options.retried &&
+    !path.startsWith("/auth/") &&
+    token
+  ) {
+    // Outra requisição já renovou enquanto esta estava em voo: só repete com o token novo.
+    const result = getToken() !== token ? "ok" : await refreshSession();
+    if (result === "ok") {
+      return api<T>(path, { ...options, token: undefined, retried: true });
+    }
+    if (result === "offline") {
+      throw new ApiError(0, "Não foi possível conectar à API. Confira se ela está no ar.");
+    }
+  }
+
+  if (response.status === 401 && options.auth !== false && !path.startsWith("/auth/")) {
     await clearToken();
     onUnauthorized?.();
   }

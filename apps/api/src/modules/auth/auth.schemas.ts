@@ -20,5 +20,9 @@ export const loginBodySchema = z.object({
   password: z.string().min(1),
 });
 
+export const refreshBodySchema = z.object({
+  refreshToken: z.string().min(20).max(200),
+});
+
 export type RegisterBody = z.infer<typeof registerBodySchema>;
 export type LoginBody = z.infer<typeof loginBodySchema>;

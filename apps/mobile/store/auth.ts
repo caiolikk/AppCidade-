@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { api, ApiError, setUnauthorizedHandler } from "../lib/api";
-import { clearToken, loadToken, setToken } from "../lib/session";
+import { clearToken, getRefreshToken, getToken, loadToken, setSessionTokens } from "../lib/session";
 import type { AuthResponse, AuthUser } from "../lib/types";
 
 type AuthState = {
@@ -30,8 +30,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     try {
+      // Com o access token vencido, o api() renova a sessão (D-033) e repete o /me.
       const user = await api<AuthUser>("/me", { token });
-      set({ token, user, hydrating: false });
+      set({ token: getToken() ?? token, user, hydrating: false });
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         await clearToken();
@@ -42,13 +43,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
   applySession: async (session) => {
-    await setToken(session.accessToken);
+    await setSessionTokens(session.accessToken, session.refreshToken);
     set({ token: session.accessToken, user: session.user });
   },
   setUser: (user) => {
     set({ user });
   },
   logout: async () => {
+    // Encerra a sessão também no servidor (best effort: sem rede, só apaga no aparelho).
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      void api("/auth/logout", { body: { refreshToken }, auth: false }).catch(() => undefined);
+    }
     await clearToken();
     set({ token: null, user: null });
   },

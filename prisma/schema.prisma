@@ -58,6 +58,8 @@ model User {
   statusChanges      OccurrenceStatusHistory[]
 
   @@index([santosNeighborhoodId])
+  refreshTokens RefreshToken[]
+
   @@map("users")
 }
 
@@ -180,4 +182,20 @@ model OccurrenceStatusHistory {
   @@index([occurrenceId])
   @@index([changedById])
   @@map("occurrence_status_history")
+}
+
+/// Sessão longa do app (D-033): só o hash SHA-256 do refresh token é guardado. Cada renovação
+/// revoga o anterior (rotação) e cria um novo.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }

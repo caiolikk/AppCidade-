@@ -1,7 +1,7 @@
 import { resolveResidentialAddress } from "../cep/resolve-address.js";
 import { prisma } from "../../lib/prisma.js";
 import { HttpError } from "../../utils/http-error.js";
-import { signAccessToken } from "../../utils/jwt.js";
+import { createSession } from "./session.js";
 import { hashPassword, verifyPassword } from "../../utils/password.js";
 import { toPrivateUser } from "./auth.dto.js";
 import type { LoginBody, RegisterBody } from "./auth.schemas.js";
@@ -32,11 +32,7 @@ export async function registerCitizen(input: RegisterBody) {
     },
   });
 
-  return {
-    user: toPrivateUser(user),
-    accessToken: signAccessToken({ sub: user.id, role: user.role }),
-    expiresIn: "15m",
-  };
+  return createSession(user);
 }
 
 export async function login(input: LoginBody) {
@@ -48,11 +44,7 @@ export async function login(input: LoginBody) {
     throw new HttpError(401, "E-mail ou senha inválidos.");
   }
 
-  return {
-    user: toPrivateUser(user),
-    accessToken: signAccessToken({ sub: user.id, role: user.role }),
-    expiresIn: "15m",
-  };
+  return createSession(user);
 }
 
 export async function getMe(userId: string) {

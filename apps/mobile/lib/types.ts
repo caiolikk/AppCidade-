@@ -28,6 +28,8 @@ export type AuthResponse = {
   user: AuthUser;
   accessToken: string;
   expiresIn: string;
+  /** Sessão longa (D-033): troca-se em `POST /auth/refresh` quando o access token vence. */
+  refreshToken: string;
 };
 
 /** Opção do menu da categoria (Figma), vinda do `GET /categories` (D-022). */

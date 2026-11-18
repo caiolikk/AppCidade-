@@ -58,7 +58,12 @@ Não registre ajustes triviais (estilo, renomes, typos). Não duplique: faça um
 
 ## Formato dos prompts
 
-Prompts de tarefa seguem `docs/PROMPT_TEMPLATE.md`: papel, contexto, objetivo, regras, auditoria, planejamento, implementação, validação, restrições e relatório. Se um prompt chegar sem essa estrutura, extraia as seções implícitas e registre-as no plano. Pergunte só o que for realmente ambíguo.
+**Todo prompt de tarefa é primeiro melhorado e só depois executado** (pedido do usuário, D-029). Procedimento completo na skill `melhorar-prompt` (`.claude/skills/melhorar-prompt/SKILL.md`), modelo em `docs/PROMPT_TEMPLATE.md` e exemplo de referência em `docs/prompts/exemplo-hospedagem.md`.
+
+- **Vale para tarefas:** código, plano, pesquisa, documentação, configuração, deploy, decisão técnica. **Não vale para conversa:** pergunta rápida, confirmação ("ok", "pronto"), "e agora?", escolha entre opções já apresentadas. Nesses casos, responda direto.
+- **Como:** reescreva a mensagem no modelo detalhado (papel e objetivo, contexto, auditoria, seções do pedido, entregável, restrições, relatório final, resultado esperado). Preserve a intenção e **todas** as perguntas do usuário, não acrescente escopo, herde as regras deste arquivo e infira o modo pelas palavras dele (só planejar × implementar).
+- **Onde fica:** o prompt melhorado completo vai para o plano do tema (seção "Pedido (prompt estruturado)") **antes** de agir. No chat, mostre só um resumo curto da interpretação (objetivo, modo, escopo, entregáveis, restrições) e siga executando no mesmo turno.
+- **Perguntas:** só pergunte se a dúvida mudar o resultado (ex.: não dá para saber se é para planejar ou implementar). Se o prompt já vier estruturado, apenas complete o que faltar.
 
 ## Relatório final de cada tarefa
 

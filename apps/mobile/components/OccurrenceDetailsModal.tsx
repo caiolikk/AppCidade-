@@ -63,6 +63,8 @@ export function OccurrenceDetailsModal({
                 occurrence={occurrence}
                 userPosition={userPosition}
                 onShowOnMap={onShowOnMap ? () => onShowOnMap(occurrence.id) : undefined}
+                onLeave={onClose}
+                onRemoved={onClose}
               />
             ) : (
               <Text style={styles.missing}>Ocorrência não encontrada.</Text>

@@ -60,3 +60,28 @@ export const updateStatusBodySchema = z.object({
     "INVALIDA",
   ]),
 });
+
+/**
+ * Edição pelo autor (D-032): só os campos enviados mudam. Local vai em par (latitude +
+ * longitude) e a categoria leva junto a subcategoria (`null` = sem subcategoria, "Outros").
+ * `media` troca a foto.
+ */
+export const updateOccurrenceBodySchema = z
+  .object({
+    title: createOccurrenceBodySchema.shape.title.optional(),
+    description: createOccurrenceBodySchema.shape.description.optional(),
+    latitude: latitudeSchema.optional(),
+    longitude: longitudeSchema.optional(),
+    categoryId: createOccurrenceBodySchema.shape.categoryId.optional(),
+    subcategoryId: z.string().uuid("Subcategoria inválida.").nullable().optional(),
+    media: z.array(mediaSchema).length(1, "Envie uma foto.").optional(),
+  })
+  .refine((body) => (body.latitude === undefined) === (body.longitude === undefined), {
+    message: "Envie latitude e longitude juntas.",
+  })
+  .refine((body) => body.subcategoryId === undefined || body.categoryId !== undefined, {
+    message: "Envie a categoria junto com a subcategoria.",
+  })
+  .refine((body) => Object.values(body).some((value) => value !== undefined), {
+    message: "Nada para alterar.",
+  });

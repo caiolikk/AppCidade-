@@ -1,47 +1,100 @@
 ---
 tipo: modelo-de-prompt
-atualizado: 2026-11-13
+atualizado: 2026-11-17
 ---
 
 # Modelo de prompt para tarefas do Cidade+
 
-> Copie, preencha e apague o que não se aplicar. Tarefas pequenas podem usar só 2, 3, 4 e 9. O agente segue o ciclo do `AGENTS.md` mesmo quando o prompt não traz todas as seções.
+> Usado pela skill `melhorar-prompt` (D-029). Toda mensagem de **tarefa** do usuário é reescrita neste formato antes de ser executada. Exemplo completo, da mensagem informal ao prompt final: [[exemplo-hospedagem]].
+>
+> Use as seções na proporção da tarefa. Um ajuste pequeno pode ficar com 1, 2, 3, uma seção de pedido, 6, 7 e 8. Nunca invente fatos para preencher uma seção: o que não se sabe vira pergunta da auditoria ou "pendente de investigação".
+
+## Modelo detalhado
 
 ```markdown
-# <Título curto da tarefa>
+# <Título que nomeia a entrega: tema + tipo de trabalho — Cidade+>
 
-## 1. Papel
-Atue como <ex.: engenheiro sênior em React Native/Expo, Fastify, Prisma/PostGIS>.
+## 1. Papel e objetivo
+Atue como <papéis com experiência relevante: ex. engenheiro de software / DevOps, product designer, arquiteto…>.
 
-## 2. Contexto e problema
-- O que acontece hoje:
-- O que deveria acontecer:
-- O que motivou o pedido:
-- Mudanças anteriores relevantes (se souber: plano, D-0xx, P-0xx):
+<O que o usuário quer, em 2 ou 3 frases, na voz dele.>
 
-## 3. Objetivo
-<resultado verificável, não "melhore a tela">
+<Modo, explícito e em negrito: **Neste momento quero apenas auditoria, pesquisa e planejamento. Não quero implementar nada agora.**
+— ou — **Quero implementar <X>, seguindo o ciclo do AGENTS.md.**>
 
-## 4. Regras principais
-- Não quebrar o que já funciona.
-- Não inventar endpoints/propriedades; reutilizar padrões e componentes existentes.
-- <regras específicas>
+O objetivo é terminar esta etapa sabendo / tendo:
+- <cada dúvida ou resultado que o usuário mencionou, um por linha — nenhuma pode sumir>
 
-## 5. Auditoria (antes de mexer)
-Investigar código, documentação no Obsidian, planos, dependências e impactos. Registrar em `plans/<tema>.md`.
+## 2. Contexto e cenário
+<Situação atual, motivação, prazos, restrições de custo, opções que o usuário citou.>
+<Se ele sugeriu uma solução: "Avalie <opção>, mas não a considere automaticamente a melhor; compare com alternativas.">
+<Estratégia em etapas, se houver: agora × futuro.>
 
-## 6. Planejamento
-O que muda, como, quais arquivos e como preservar o comportamento atual. Atualizar o plano **antes** do código.
+## 3. Auditoria do estado atual (antes de propor ou mexer)
+Consulte o Obsidian (`docs/PROJECT_CONTEXT.md`, `docs/DECISIONS.md`, `docs/PROBLEMS.md`), os planos em `plans/` e o código-fonte. O código é a fonte da verdade.
 
-## 7. Implementação
-Seguir o plano; se a estratégia mudar, atualizar o plano primeiro.
+Identifique, por camada (só as que a tarefa toca):
+### 3.1. <Mobile / Frontend> — <perguntas concretas>
+### 3.2. <API / Backend> — <perguntas concretas>
+### 3.3. <Banco de dados> — <perguntas concretas>
+### 3.4. <Infra / outra área> — <perguntas concretas>
 
-## 8. Validação
-Funcionamento esperado, casos extremos, nulos/incompletos, regressões e integrações afetadas.
+Não presuma que estruturas, campos, endpoints ou serviços existem sem verificar.
+<Se ajudar: "Ao final, apresente um diagrama (Mermaid) do estado atual.">
 
-## 9. Restrições
-<o que NÃO pode ser alterado>
+## 4…N. <Uma seção por frente do pedido>
+<Transforme cada dúvida em perguntas numeradas e específicas.>
+<Quando houver escolha: critérios de comparação em tabela (preço, complexidade, riscos…).>
+<Peça cenários alternativos e quando cada um faz sentido.>
+<Regras de honestidade quando houver pesquisa:
+- use fontes oficiais e inclua os links;
+- não invente valores, comandos nem funcionalidades;
+- diferencie confirmado × hipótese; promocional × renovação.>
+<Peça recomendação final justificada, sem escolher "porque é comum" ou "porque é mais barato".>
 
-## 10. Relatório final
-Investigado · implementado · arquivos · decisões · testes/resultados · docs atualizadas · pendências.
+## <N+1>. Planejamento / passo a passo
+<Etapas em ordem cronológica. Para cada uma: o que fazer, por quê, onde, ferramentas, configurações, como verificar, cuidados.>
+<Comandos só quando verificados nos scripts e arquivos reais do projeto.>
+
+## <N+2>. Entregável
+Crie ou atualize `plans/<tema>.md` (antes, procure planos do mesmo tema; um plano por tema, nova seção datada).
+O documento deve conter:
+1. <seção>
+2. <seção>
+…
+Inclua diagramas Mermaid quando ajudarem. Diferencie claramente:
+- o que foi identificado no código atual;
+- o que foi pesquisado externamente;
+- o que é recomendação;
+- o que depende de decisão do time.
+
+## <N+3>. Restrições obrigatórias
+<Modo só planejamento: **ESTA ETAPA É EXCLUSIVAMENTE DE AUDITORIA, PESQUISA E PLANEJAMENTO.** Não modificar código, configuração, Docker, workflows, variáveis, dependências, banco, migrations, contas ou deploy. A única alteração permitida é a documentação em `plans/`.>
+<Modo implementação: plano escrito antes do código; não alterar schema/migrations nem comportamento existente sem necessidade registrada; não adicionar dependências desnecessárias; não mexer no que está fora do escopo; testar e registrar os resultados.>
+<Sempre: nunca ler nem copiar `.env`, senhas, tokens ou chaves para a documentação.>
+
+## <N+4>. Validação (modo implementação)
+<Funcionamento esperado, casos extremos, regressões, integrações afetadas, como testar.>
+
+## <N+5>. Relatório final
+Ao concluir, apresente:
+- <uma linha para cada pergunta do usuário, respondida de forma objetiva>
+- o que foi investigado · implementado · arquivos · decisões · testes e resultados (inclusive falhas) · documentação atualizada · pendências
+- onde o plano foi criado ou atualizado
+- <modo planejamento: confirmação explícita de que nada foi implementado>
+
+**Resultado esperado:** <uma frase com o estado em que o usuário quer terminar.>
+```
+
+## Modelo curto (tarefas pequenas)
+
+```markdown
+# <Título>
+## 1. Papel e objetivo — <papel> · <resultado verificável> · <modo>
+## 2. Contexto — hoje acontece / deveria acontecer / motivo
+## 3. Auditoria — arquivos e docs a conferir antes
+## 4. O que fazer — itens concretos
+## 5. Restrições — o que não pode mudar
+## 6. Validação — como provar que funcionou
+## 7. Relatório final — investigado · feito · arquivos · testes · docs · pendências
 ```

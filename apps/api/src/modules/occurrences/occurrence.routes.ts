@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { authenticate } from "../../middleware/authenticate.js";
+import { authenticate, optionalAuthUserId } from "../../middleware/authenticate.js";
 import { authorize } from "../../middleware/authorize.js";
 import {
   checkGeofence,
@@ -8,12 +8,15 @@ import {
   getAdminOccurrence,
   getPublicOccurrence,
   listPublicOccurrences,
+  removeOwnOccurrence,
   updateOccurrenceStatus,
+  updateOwnOccurrence,
 } from "./occurrence.service.js";
 import {
   createOccurrenceBodySchema,
   evaluationBodySchema,
   geofenceBodySchema,
+  updateOccurrenceBodySchema,
   updateStatusBodySchema,
 } from "./occurrence.schemas.js";
 
@@ -22,8 +25,29 @@ export async function occurrenceRoutes(app: FastifyInstance) {
 
   app.get("/occurrences/:id", async (request) => {
     const { id } = request.params as { id: string };
-    return getPublicOccurrence(id);
+    // Público; com token válido inclui `viewer` (autor? pode editar?) — D-032.
+    return getPublicOccurrence(id, optionalAuthUserId(request));
   });
+
+  // Edição e remoção pelo autor, só enquanto "em análise" (D-032).
+  app.patch(
+    "/occurrences/:id",
+    { preHandler: [authenticate] },
+    async (request) => {
+      const { id } = request.params as { id: string };
+      const body = updateOccurrenceBodySchema.parse(request.body);
+      return updateOwnOccurrence(request.authUser!.id, id, body);
+    },
+  );
+
+  app.delete(
+    "/occurrences/:id",
+    { preHandler: [authenticate] },
+    async (request) => {
+      const { id } = request.params as { id: string };
+      return removeOwnOccurrence(request.authUser!.id, id);
+    },
+  );
 
   app.post(
     "/occurrences/geofence-check",

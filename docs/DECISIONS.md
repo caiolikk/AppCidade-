@@ -103,7 +103,7 @@ Necessários para reproduzir o Figma (ícones SVG, degradê de fundo, navbar de 
 Origem: [[interface-figma]].
 
 ## D-021 — Home "perto de mim" (5 km, no app) e direção pela bússola
-**Data:** 2026-11-14 · **Status:** Vigente
+**Data:** 2026-11-14 · **Status:** Vigente para o raio de 5 km; a **direção pela bússola foi removida** (substituída por D-030, 2026-11-17)
 A Home mostra só ocorrências a até `NEARBY_RADIUS_KM = 5` (`apps/mobile/lib/geo.ts`), ordenadas por distância (haversine **no app**, sobre o mesmo `GET /occurrences`); o **mapa mostra todas**. Critério: distância geográfica, nunca bairro. Sem localização, a Home mostra todas por data, com aviso. A direção do usuário vem do **heading da bússola** (`watchHeadingAsync`); sem leitura confiável, usa o course do GPS só acima de 1 m/s; senão, não mostra direção. Só permissão de localização em primeiro plano. O modal de detalhes é único (Home, mapa e rota). Evolução prevista: filtro no servidor com PostGIS quando o volume crescer.
 Origem: [[ocorrencias-criacao-e-mapa]].
 
@@ -177,7 +177,7 @@ Origem: [[perfil-do-usuario]].
 Origem: [[ocorrencias-criacao-e-mapa]].
 
 ## D-027 — Marcadores: ícone da categoria em quase todo zoom, bolinha só bem afastado, sem agrupamento
-**Data:** 2026-11-14 · **Status:** Vigente · limites **a calibrar no aparelho** · substitui D-026
+**Data:** 2026-11-14 · **Status:** Vigente · limites **a calibrar no aparelho** · substitui D-026 · **tamanhos, selecionado e sobreposição atualizados por D-031**
 
 - **Motivo:** no D-026, o mapa abria em cima do limite bolinha/selo (z ≈ 13,3 a 13,5). As 2 ocorrências reais, a 7 m uma da outra, viravam um círculo preto de grupo. O usuário pediu para **abandonar o agrupamento** e manter os ícones visíveis por mais tempo.
 - **Formatos** (`apps/mobile/lib/map-markers.ts`, o único lugar dos valores):
@@ -228,3 +228,99 @@ Origem: [[ocorrencias-criacao-e-mapa]].
 - **Conexão Neon:** a direta (sem pooler), porque a API é um processo único; evita `directUrl` no schema.
 - **CI/backup:** GitHub Actions (`ci.yml` com PostGIS de serviço; `backup-db.yml` com dump criptografado).
 Origem: [[hospedagem-e-deploy]].
+
+## D-029 — Todo prompt de tarefa é melhorado antes de ser executado (skill `melhorar-prompt`)
+**Data:** 2026-11-17 · **Status:** Vigente
+- **Por quê:** pedido do usuário. Mensagens curtas e informais deixavam dúvidas e restrições implícitas. O prompt estruturado (ex.: [[exemplo-hospedagem]]) garante auditoria antes de agir, modo explícito (planejar × implementar), entregável e relatório.
+- **Regra** (`AGENTS.md`, "Formato dos prompts"):
+  - **vale para tarefas**: código, plano, pesquisa, documentação, configuração, deploy, decisão;
+  - **não vale para conversa**: pergunta rápida, confirmação, "e agora?", escolha entre opções dadas.
+- **Fluxo:**
+  1. reescrever no modelo (`docs/PROMPT_TEMPLATE.md`), sem perder nenhuma dúvida e sem acrescentar escopo;
+  2. salvar o prompt completo no plano do tema ("Pedido (prompt estruturado)");
+  3. mostrar no chat só um resumo de 4 a 8 linhas;
+  4. executar no mesmo turno;
+  5. perguntar só se a dúvida mudar o resultado.
+- **Onde fica:**
+  - skill versionada em `.claude/skills/melhorar-prompt/`;
+  - ponteiro no cofre em `cidade+/.claude/skills/` (onde as sessões do Claude Code abrem);
+  - o Cursor segue a mesma regra pelo `AGENTS.md`.
+- **Alternativa descartada:** mostrar o prompt completo no chat a cada pedido. Polui a conversa; o plano já guarda a íntegra.
+Origem: [[segundo-cerebro-obsidian]].
+
+## D-030 — Mapa na 1ª aba (casa), busca de endereço pelo geocodificador nativo e sem direção do usuário
+**Data:** 2026-11-17 · **Status:** Vigente (falta validar no aparelho)
+- **Abas:**
+  - ordem `index` (Mapa, ícone **casa**, 1º) → `nearby` (Perto de você, ícone novo `nav-nearby.svg`, um pin com arco de raio) → criar → notificações → conta;
+  - antes, a casa ficava na lista "perto de você" e o mapa era o 2º botão: o app já abria no mapa (D-023), mas parecia que não;
+  - o ícone `nav-nearby` não existe no Figma; foi desenhado no mesmo traço (pendência de design);
+  - `nav-map.svg` deixou de ser usado.
+- **Busca de endereço:** `expo-location` `geocodeAsync` + `reverseGeocodeAsync`. É o geocodificador **nativo** do Android/iOS: **sem dependência nova, sem chave e sem custo**.
+  - Busca só ao confirmar no teclado, nunca a cada letra.
+  - Consulta sem cidade ganha ", Santos - SP, Brasil"; cidade da Baixada/SP, UF em maiúsculas ou CEP são respeitados (`lib/address-search.ts`).
+  - No Android o geocodificador **exige a permissão de localização** e devolve **1 resultado** (código do `expo-location` 19.0.8). Sem permissão, pede uma vez e tenta de novo.
+  - **Na web não existe**: mostra aviso.
+  - O resultado é um `Marker` nativo (sem View filha, P-013) com o endereço; o mapa anima até o zoom de rua e para de seguir o usuário.
+  - **Alternativas descartadas:**
+    - Google Geocoding/Places API: chave e cobrança;
+    - Nominatim/OSM: política de uso proíbe autocompletar e exige identificação;
+    - autocompletar a cada letra: custo e limites.
+- **Direção do usuário removida:** sem bússola (`watchHeadingAsync`), sem o `course` como direção e sem o cone.
+  - **Motivo:** o app não é de navegação; economiza bateria e sensor.
+  - O indicador é o ponto azul + o círculo de precisão; seguir e recentralizar continuam.
+  - `hooks/use-device-heading.ts` foi apagado.
+Origem: [[ocorrencias-criacao-e-mapa]].
+
+## D-031 — Marcadores: degraus de 3 dp até z 18, ordem de desenho estável, leque visual para sobrepostos e selecionado que segue o zoom
+**Data:** 2026-11-17 · **Status:** Vigente (falta validar no aparelho) · atualiza D-027 (continua **sem agrupamento**)
+- **Tamanho:**
+  - pin de **24 a 54 dp em 11 degraus de 3 dp**, distribuídos entre z 12 e z 18 (o máximo chega perto de z 17,5). Antes: 28 a 52 dp em 7 degraus de 4 dp até z 17;
+  - histerese e limite ícone/bolinha (z 12) iguais; bolinha de 10 a 14;
+  - **custo:** 504 PNGs (5,6 MB, antes 3,9 MB).
+- **Ordem estável:**
+  - `zIndex` único por ordem de criação (a mais recente por cima); selecionado > busca > usuário acima de todas;
+  - **motivo:** com `zIndex` empatado (10), o Google Maps não garante a ordem, e ela mudava a cada troca de imagem ("disputando espaço").
+- **Leque visual** (`spreadOffsets` em `lib/map-markers.ts`): no nível pin, ícones cujos centros ficam a menos de 0,8 × o tamanho **na tela** (zoom quantizado em 0,25) formam um grupo por encadeamento.
+  - Grupo de 2 ou 3: em linha. Grupo de 4 ou mais: em círculo.
+  - Espaçamento de 0,95 × o tamanho, a partir do centroide.
+  - O deslocamento vai na âncora (`anchor` no Android, `centerOffset` no iOS); uma `Polyline` fina liga a ponta à coordenada real.
+  - **Não é agrupamento:** nenhum marcador é escondido nem juntado, os dados não mudam e cada um abre a sua ocorrência. Ao aproximar até não se sobreporem, voltam ao lugar exato.
+  - Sem leque no nível bolinha.
+  - **Alternativa descartada:** clustering (rejeitado pelo usuário em D-027).
+- **Bug "nem todas viram bolinha":**
+  - **causa:** o selecionado era sempre o pin grande, em qualquer zoom, e `selectedId` ficava preso depois de fechar o modal;
+  - **correção:**
+    - o selecionado segue o nível (bolinha maior no nível bolinha, pin de 60 no nível pin);
+    - fechar os detalhes limpa a seleção;
+    - a `key` do `Marker` inclui o formato (remonta na troca pin ↔ bolinha, imagem e âncora juntas no Android).
+- **Desempenho:** o pan não recalcula; o leque é recalculado só na troca de degrau ou de zoom quantizado; marcadores memoizados com comparação por valor; 1000 pontos em menos de 80 ms no teste.
+Origem: [[ocorrencias-criacao-e-mapa]].
+
+## D-032 — O autor edita e remove a própria ocorrência só enquanto ela está "em análise"; remoção suave
+**Data:** 2026-11-17 · **Status:** Vigente (API testada; app sem teste no aparelho)
+- **Regra:** só o **autor**, e só nos 3 status que o app mostra como "em análise" (`REPORTADA`, `RECEBIDA`, `EM_ANALISE`; constante `AUTHOR_EDITABLE_STATUSES` em `occurrence.service.ts`).
+  - Depois que o gestor move para `EM_ATENDIMENTO`, `RESOLVIDA`, `ARQUIVADA` ou `INVALIDA`, não dá mais.
+  - Respostas: outra pessoa → 403; fora de análise → 409; removida → 404.
+  - O update é condicional (`updateMany` com autor, status e `deletedAt: null`), contra a corrida com o gestor.
+  - **Hoje nada tira uma ocorrência de "em análise"** além de `PATCH /admin/occurrences/:id/status` (não há painel e os votos não mudam o status).
+- **Edição** (`PATCH /occurrences/:id`, parcial):
+  - campos: título, descrição, categoria + subcategoria (mesmas validações da criação, D-022), local em par e foto (`media`, 1 item);
+  - trocar a foto apaga a anterior (linha e arquivo, best effort).
+- **Remoção suave** (`DELETE /occurrences/:id`):
+  - grava `occurrences.deletedAt` (migration aditiva `20261118020421_occurrence_soft_delete`);
+  - avaliações e histórico de status **ficam no banco**;
+  - as **fotos são apagadas** na hora (linhas e arquivos), porque quem remove espera que a foto suma.
+  - Removidas saem de lista, detalhe, voto, mudança de status do gestor e perfil (contagem e listas). O `GET /admin/occurrences/:id` ainda mostra, com `deletedAt`.
+- **Reputação:** os votos recebidos em ocorrências removidas **continuam contando**. Remover não limpa avaliações negativas (brecha apontada em [[gamificacao-e-validacao-comunitaria]]).
+- **Quem é o autor, sem expor o autor:** `GET /occurrences/:id` aceita login opcional e devolve `viewer: { isAuthor, canEdit }` (`optionalAuthUserId`; token inválido é ignorado). O DTO público continua sem dados do autor (D-006).
+- **App:**
+  - o formulário da criação virou `components/OccurrenceForm`, usado por `(tabs)/create.tsx` e pela nova rota `occurrence/edit/[id]`;
+  - "Editar" e "Remover" (com confirmação) aparecem nos detalhes só para o autor;
+  - fora de análise, aparece um aviso no lugar;
+  - o cache do detalhe tem o id do usuário na chave.
+- **Alternativas descartadas:**
+  - exclusão real (a cascata apagaria os votos de outras pessoas e o histórico);
+  - remoção livre em qualquer status (apagaria o registro de um atendimento em curso);
+  - expor `authorId` no DTO público.
+Origem: [[ocorrencias-edicao-e-remocao]].
+

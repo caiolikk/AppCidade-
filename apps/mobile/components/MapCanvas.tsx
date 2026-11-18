@@ -1,14 +1,20 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, useWindowDimensions, View } from "react-native";
-import MapView, { Circle, Marker, type Region } from "react-native-maps";
+import MapView, { Circle, Marker, Polyline, type Region } from "react-native-maps";
 import type { UserPosition } from "../hooks/use-user-location";
 import {
+  MARKER_SIZES,
   SELECTED_PIN_SIZE,
   markerSize,
   nextMarkerScale,
   pinHeight,
+  project,
+  quantizeZoom,
+  spreadOffsets,
+  unproject,
   zoomFromRegion,
   type MarkerScale,
+  type SpreadOffset,
 } from "../lib/map-markers";
 import { MARKER_IMAGES } from "../lib/pin-images";
 import type { PublicOccurrence } from "../lib/types";
@@ -46,36 +52,55 @@ type MarkerLook = {
 };
 
 const CENTER = { x: 0.5, y: 0.5 };
-const TAIL = { x: 0.5, y: 1 }; // ponta da cauda = coordenada exata
 const NO_OFFSET = { x: 0, y: 0 };
-const tailOffsets = new Map<number, { x: number; y: number }>();
-function tailOffset(diameter: number) {
-  let offset = tailOffsets.get(diameter);
-  if (!offset) {
-    offset = { x: 0, y: -pinHeight(diameter) / 2 };
-    tailOffsets.set(diameter, offset);
-  }
-  return offset;
+const NO_SPREAD: SpreadOffset = { dx: 0, dy: 0 };
+/** Maior bolinha: o selecionado no nível "dot" (D-031). */
+const SELECTED_DOT_SIZE = Math.max(...MARKER_SIZES.dot.sizes);
+
+/**
+ * Âncora de um pin de diâmetro `d` (bitmap (d+6) × pinHeight(d), ponta da cauda na base),
+ * deslocado `spread` dp na tela pelo leque (D-031). Sem leque, a ponta fica na coordenada.
+ */
+function pinAnchor(d: number, spread: SpreadOffset) {
+  const width = d + 6;
+  const height = pinHeight(d);
+  return {
+    anchor: { x: 0.5 - spread.dx / width, y: 1 - spread.dy / height },
+    centerOffset: { x: spread.dx, y: -height / 2 + spread.dy },
+  };
 }
 
 /**
- * Bitmap do marcador para o formato/tamanho atual (scripts/generate-pins.ps1, D-027):
- * ícone da categoria (pin) na maior parte dos zooms, bolinha do status só bem afastado.
- * O selecionado é sempre o pin grande. `image: null` = categoria sem ilustração (cai no pin
- * nativo na cor do status).
+ * Bitmap do marcador para o formato/tamanho atual (scripts/generate-pins.ps1, D-027/D-031):
+ * ícone da categoria (pin) na maior parte dos zooms, bolinha do status só bem afastado — o
+ * selecionado TAMBÉM segue o nível (antes ficava pin grande em qualquer zoom: era o bug da
+ * "ocorrência que não vira bolinha"). `image: null` = sem bitmap (pin nativo na cor do status).
  */
-function markerLook(occurrence: PublicOccurrence, scale: MarkerScale, selected: boolean): MarkerLook {
+function markerLook(
+  occurrence: PublicOccurrence,
+  scale: MarkerScale,
+  selected: boolean,
+  spread: SpreadOffset,
+): MarkerLook {
   const visual = statusVisual[occurrence.status];
   const slug = categorySlug(occurrence.category.name);
-  if (selected) {
-    return { image: MARKER_IMAGES[`pin/${slug}/${visual}/sel`] ?? null, anchor: TAIL, centerOffset: tailOffset(SELECTED_PIN_SIZE) };
-  }
-  const size = markerSize(scale);
   if (scale.level === "dot") {
+    const size = selected ? SELECTED_DOT_SIZE : markerSize(scale);
     return { image: MARKER_IMAGES[`dot/${visual}/${size}`] ?? null, anchor: CENTER, centerOffset: NO_OFFSET };
   }
-  return { image: MARKER_IMAGES[`pin/${slug}/${visual}/${size}`] ?? null, anchor: TAIL, centerOffset: tailOffset(size) };
+  const size = selected ? SELECTED_PIN_SIZE : markerSize(scale);
+  const key = selected ? `pin/${slug}/${visual}/sel` : `pin/${slug}/${visual}/${size}`;
+  return { image: MARKER_IMAGES[key] ?? null, ...pinAnchor(size, spread) };
 }
+
+export type SearchTarget = {
+  latitude: number;
+  longitude: number;
+  /** Rótulo do endereço encontrado (aparece ao tocar no marcador). */
+  label: string;
+  /** Muda a cada busca: refaz a animação mesmo para o mesmo ponto. */
+  key: number;
+};
 
 type MapCanvasProps = {
   occurrences: PublicOccurrence[];
@@ -86,10 +111,10 @@ type MapCanvasProps = {
   focusId?: string | null;
   /** Muda a cada pedido de foco: refaz a animação mesmo para a mesma ocorrência. */
   focusKey?: string | number | null;
-  /** Posição do usuário (null = sem permissão/GPS: nada é desenhado). */
+  /** Posição do usuário (null = sem permissão/GPS: nada é desenhado). Sem direção (D-030). */
   userPosition?: UserPosition | null;
-  /** Direção a desenhar no indicador (heading da bússola ou course em movimento); null = sem cone. */
-  userDirection?: number | null;
+  /** Resultado da busca de endereço: o mapa anima até ele e mostra um marcador (D-030). */
+  searchTarget?: SearchTarget | null;
   /** Mapa acompanhando o usuário. */
   following?: boolean;
   /** Incrementa para recentralizar (botão). */
@@ -105,7 +130,7 @@ export function MapCanvas({
   focusId,
   focusKey = null,
   userPosition,
-  userDirection = null,
+  searchTarget = null,
   following = false,
   recenterKey = 0,
   onUserGesture,
@@ -124,15 +149,22 @@ export function MapCanvas({
   );
   const scaleRef = useRef(scale);
   const lastRegionRun = useRef(0);
+  // Zoom quantizado (0,25): o leque só é recalculado quando ele muda (D-031).
+  const [spreadZoom, setSpreadZoom] = useState(() =>
+    quantizeZoom(zoomFromRegion(SANTOS_REGION.longitudeDelta, screen.width)),
+  );
 
-  /** Só muda estado quando o formato ou o degrau de tamanho mudam (o pan não custa nada). */
+  /** Só muda estado quando o formato, o degrau ou o zoom quantizado mudam (o pan não custa nada). */
   const applyRegion = useCallback(
     (region: Region) => {
-      const next = nextMarkerScale(zoomFromRegion(region.longitudeDelta, mapWidth), scaleRef.current);
+      const zoom = zoomFromRegion(region.longitudeDelta, mapWidth);
+      const next = nextMarkerScale(zoom, scaleRef.current);
       if (next.level !== scaleRef.current.level || next.step !== scaleRef.current.step) {
         scaleRef.current = next;
         setScale(next);
       }
+      const quantized = quantizeZoom(zoom);
+      setSpreadZoom((current) => (current === quantized ? current : quantized));
     },
     [mapWidth],
   );
@@ -147,16 +179,44 @@ export function MapCanvas({
     [applyRegion],
   );
 
-  // Um marcador por ocorrência, SEM agrupamento (D-027). Ordem por data: em sobreposição, a
-  // mais recente fica por cima. O selecionado é desenhado à parte, acima de todos.
+  // Um marcador por ocorrência, SEM agrupamento (D-027). Ordem por data, mais recente por
+  // cima, com zIndex ÚNICO por marcador (D-031): com zIndex empatado o Google Maps não
+  // garante quem fica por cima e a ordem mudava a cada troca de imagem ("disputa").
   const ordered = useMemo(
-    () =>
-      occurrences
-        .filter((item) => item.id !== selectedId)
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-    [occurrences, selectedId],
+    () => [...occurrences].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || (a.id < b.id ? -1 : 1)),
+    [occurrences],
   );
-  const selected = selectedId ? occurrences.find((item) => item.id === selectedId) ?? null : null;
+  const topZ = ordered.length + 10; // acima de todas as ocorrências
+  const selected = selectedId ? ordered.find((item) => item.id === selectedId) ?? null : null;
+
+  // Leque visual (D-031): só no nível "pin"; recalculado na troca de degrau/zoom quantizado.
+  const pinSize = markerSize(scale);
+  const offsets = useMemo(() => {
+    if (scale.level !== "pin") return new Map<string, SpreadOffset>();
+    return spreadOffsets(
+      ordered.map((item, index) => ({
+        id: item.id,
+        latitude: Number(item.latitude),
+        longitude: Number(item.longitude),
+        order: index,
+      })),
+      spreadZoom,
+      pinSize,
+    );
+  }, [ordered, scale.level, pinSize, spreadZoom]);
+
+  // Linhas finas da ponta deslocada até a posição real (só para quem está em leque).
+  const leaderLines = useMemo(
+    () =>
+      ordered.flatMap((item) => {
+        const spread = offsets.get(item.id);
+        if (!spread) return [];
+        const real = { latitude: Number(item.latitude), longitude: Number(item.longitude) };
+        const xy = project(real.latitude, real.longitude, spreadZoom);
+        return [{ id: item.id, coordinates: [real, unproject(xy.x + spread.dx, xy.y + spread.dy, spreadZoom)] }];
+      }),
+    [ordered, offsets, spreadZoom],
+  );
 
   // Callback estável para os marcadores memoizados não re-renderizarem à toa.
   const onSelectRef = useRef(onSelect);
@@ -185,6 +245,24 @@ export function MapCanvas({
       600,
     );
   }, [focusId, focusKey, occurrences, mapReady]);
+
+  // Busca de endereço: anima até o ponto encontrado (uma vez por busca, depois do mapa pronto).
+  const lastSearch = useRef<number | null>(null);
+  useEffect(() => {
+    if (!searchTarget || !mapReady || lastSearch.current === searchTarget.key) {
+      return;
+    }
+    lastSearch.current = searchTarget.key;
+    mapRef.current?.animateToRegion(
+      {
+        latitude: searchTarget.latitude,
+        longitude: searchTarget.longitude,
+        latitudeDelta: STREET_DELTA,
+        longitudeDelta: STREET_DELTA,
+      },
+      600,
+    );
+  }, [searchTarget, mapReady]);
 
   // Recentralizar (botão): volta ao zoom de rua sobre o usuário.
   useEffect(() => {
@@ -230,33 +308,49 @@ export function MapCanvas({
             fillColor="rgba(13,58,159,0.12)"
             strokeColor="rgba(13,58,159,0.35)"
             strokeWidth={1}
-            zIndex={1}
+            zIndex={0}
           />
         ) : null}
 
-        {ordered.map((occurrence) => (
-          <OccurrenceMarker
-            key={occurrence.id}
-            occurrence={occurrence}
-            look={markerLook(occurrence, scale, false)}
-            selected={false}
-            onSelect={selectById}
+        {leaderLines.map((line) => (
+          <Polyline
+            key={`leader:${line.id}`}
+            coordinates={line.coordinates}
+            strokeColor="rgba(13,13,13,0.45)"
+            strokeWidth={1.5}
+            zIndex={0}
+            tappable={false}
           />
         ))}
 
-        {selected ? (
-          <OccurrenceMarker
-            key={`selected:${selected.id}`}
-            occurrence={selected}
-            look={markerLook(selected, scale, true)}
-            selected
-            onSelect={selectById}
+        {ordered.map((occurrence, index) => {
+          const isSelected = occurrence.id === selectedId;
+          return (
+            <OccurrenceMarker
+              // O formato entra na key: trocar pin ↔ bolinha REMONTA o marcador, e o Android
+              // aplica imagem e âncora novas juntas (antes alguns ficavam como pin, D-031).
+              key={`${occurrence.id}:${scale.level}${isSelected ? ":sel" : ""}`}
+              occurrence={occurrence}
+              look={markerLook(occurrence, scale, isSelected, offsets.get(occurrence.id) ?? NO_SPREAD)}
+              zIndex={isSelected ? topZ + 3 : index + 1}
+              onSelect={selectById}
+            />
+          );
+        })}
+
+        {searchTarget ? (
+          // Pin nativo, sem View filha (P-013): nada para cortar no Android.
+          <Marker
+            key={`search:${searchTarget.key}`}
+            coordinate={{ latitude: searchTarget.latitude, longitude: searchTarget.longitude }}
+            title={searchTarget.label}
+            pinColor={colors.text}
+            zIndex={topZ + 2}
+            accessibilityLabel={`Endereço buscado: ${searchTarget.label}`}
           />
         ) : null}
 
-        {userPosition ? (
-          <UserLocationMarker position={userPosition} direction={userDirection} />
-        ) : null}
+        {userPosition ? <UserLocationMarker position={userPosition} zIndex={topZ + 1} /> : null}
       </MapView>
 
     </View>
@@ -271,12 +365,13 @@ export function MapCanvas({
 const OccurrenceMarker = memo(function OccurrenceMarker({
   occurrence,
   look,
-  selected,
+  zIndex,
   onSelect,
 }: {
   occurrence: PublicOccurrence;
   look: MarkerLook;
-  selected: boolean;
+  /** Único por marcador (ordem de criação); o selecionado fica acima de todos. */
+  zIndex: number;
   onSelect: (id: string) => void;
 }) {
   const coordinate = {
@@ -296,7 +391,7 @@ const OccurrenceMarker = memo(function OccurrenceMarker({
         coordinate={coordinate}
         pinColor={statusVisualColors[statusVisual[occurrence.status]].dot}
         onPress={handlePress}
-        zIndex={selected ? 40 : 10}
+        zIndex={zIndex}
         accessibilityLabel={label}
       />
     );
@@ -310,56 +405,50 @@ const OccurrenceMarker = memo(function OccurrenceMarker({
       centerOffset={look.centerOffset}
       tracksViewChanges={false}
       onPress={handlePress}
-      zIndex={selected ? 40 : 10}
+      zIndex={zIndex}
       accessibilityLabel={label}
     />
   );
 }, sameMarker);
 
+/** Compara por VALOR (a aparência é recriada a cada render): só re-renderiza se algo mudou. */
 function sameMarker(
-  a: { occurrence: PublicOccurrence; look: MarkerLook; selected: boolean },
-  b: { occurrence: PublicOccurrence; look: MarkerLook; selected: boolean },
+  a: { occurrence: PublicOccurrence; look: MarkerLook; zIndex: number },
+  b: { occurrence: PublicOccurrence; look: MarkerLook; zIndex: number },
 ) {
   return (
     a.occurrence === b.occurrence &&
-    a.selected === b.selected &&
+    a.zIndex === b.zIndex &&
     a.look.image === b.look.image &&
-    a.look.anchor === b.look.anchor
+    a.look.anchor.x === b.look.anchor.x &&
+    a.look.anchor.y === b.look.anchor.y &&
+    a.look.centerOffset.x === b.look.centerOffset.x &&
+    a.look.centerOffset.y === b.look.centerOffset.y
   );
 }
 
 /**
- * Indicador do usuário: ponto azul com borda branca e, se houver direção confiável, um cone.
- * `flat` + `rotation` = o cone aponta para o rumo geográfico mesmo com o mapa girado.
+ * Indicador do usuário: só o ponto azul com borda branca (a precisão é o `Circle` do mapa).
+ * Sem seta/cone de direção: o app não é de navegação (D-030). O snapshot da View é gerado
+ * uma vez (tracksViewChanges só nos primeiros 500 ms) para não redesenhar à toa.
  */
-function UserLocationMarker({
-  position,
-  direction,
-}: {
-  position: UserPosition;
-  direction: number | null;
-}) {
-  const hasDirection = direction !== null;
+function UserLocationMarker({ position, zIndex }: { position: UserPosition; zIndex: number }) {
   const [tracks, setTracks] = useState(true);
   useEffect(() => {
-    setTracks(true);
     const timer = setTimeout(() => setTracks(false), 500);
     return () => clearTimeout(timer);
-  }, [hasDirection]);
+  }, []);
 
   return (
     <Marker
       coordinate={{ latitude: position.latitude, longitude: position.longitude }}
       anchor={{ x: 0.5, y: 0.5 }}
-      flat
-      rotation={direction ?? 0}
       tracksViewChanges={tracks}
-      zIndex={30}
+      zIndex={zIndex}
       tappable={false}
       accessibilityLabel="Sua localização"
     >
       <View style={styles.userWrap}>
-        {hasDirection ? <View style={styles.userCone} /> : null}
         <View style={styles.userDot} />
       </View>
     </Marker>
@@ -374,18 +463,6 @@ const styles = StyleSheet.create({
     height: USER_SIZE,
     alignItems: "center",
     justifyContent: "center",
-  },
-  userCone: {
-    position: "absolute",
-    top: 0,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderBottomWidth: 18,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderBottomColor: "rgba(13,58,159,0.75)",
   },
   userDot: {
     width: 18,

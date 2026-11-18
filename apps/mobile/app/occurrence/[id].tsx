@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BackButton } from "../../components/BackButton";
@@ -9,6 +9,7 @@ import { colors, type } from "../../theme";
 /** Rota de detalhe (links diretos). Reutiliza o mesmo conteúdo do modal (`OccurrenceDetails`). */
 export default function OccurrenceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const query = useOccurrence(id ?? "");
   const occurrence = query.data;
 
@@ -25,7 +26,11 @@ export default function OccurrenceDetailScreen() {
         <Text style={styles.missing}>Ocorrência não encontrada.</Text>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          <OccurrenceDetails key={occurrence.id} occurrence={occurrence} />
+          <OccurrenceDetails
+            key={occurrence.id}
+            occurrence={occurrence}
+            onRemoved={() => (router.canGoBack() ? router.back() : router.replace("/"))}
+          />
         </ScrollView>
       )}
     </SafeAreaView>

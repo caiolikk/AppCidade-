@@ -1,8 +1,8 @@
-# Gera os bitmaps dos marcadores do mapa (plano ocorrencias-criacao-e-mapa; D-027).
+# Gera os bitmaps dos marcadores do mapa (plano ocorrencias-criacao-e-mapa; D-027/D-031).
 # Bitmaps (e nao Views) por causa do P-013 (snapshot cortado no Android). Sem agrupamento.
 #   dot-<status>-<d>        bolinha na cor do status com contorno branco (so com o mapa bem afastado)
 #   pin-<cat>-<status>-<d>  icone: pin com ilustracao da categoria e anel do status (diminui ao afastar)
-#   pin-<cat>-<status>-sel  selecionado (58, um so tamanho)
+#   pin-<cat>-<status>-sel  selecionado (60, um so tamanho)
 # Os tamanhos DEVEM bater com lib/map-markers.ts (MARKER_SIZES, SELECTED_PIN_SIZE, pinHeight).
 # Saida: assets/pins/*@2x.png e @3x.png + lib/pin-images.ts
 # Uso (PowerShell, na pasta apps/mobile):  powershell -ExecutionPolicy Bypass -File scripts/generate-pins.ps1
@@ -31,8 +31,8 @@ $statuses = [ordered]@{
   "negado"    = "#AC0C0C"
 }
 $dotSizes = @(10, 12, 14)
-$pinSizes = @(28, 32, 36, 40, 44, 48, 52)
-$selectedSize = 58
+$pinSizes = @(24, 27, 30, 33, 36, 39, 42, 45, 48, 51, 54)
+$selectedSize = 60
 $scales = @(2, 3)
 
 function New-Canvas($w, $h) {

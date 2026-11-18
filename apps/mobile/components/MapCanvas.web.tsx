@@ -18,7 +18,8 @@ type MapCanvasProps = {
   onSelect: (id: string) => void;
   focusId?: string | null;
   userPosition?: unknown;
-  userDirection?: number | null;
+  /** Ignorado na web: a geocodificação nativa não existe aqui (D-030). */
+  searchTarget?: unknown;
   following?: boolean;
   recenterKey?: number;
   onUserGesture?: () => void;

@@ -4,7 +4,7 @@ import { HttpError } from "../../utils/http-error.js";
 import { toPrivateUser } from "../auth/auth.dto.js";
 import { resolveResidentialAddress } from "../cep/resolve-address.js";
 import { toPublicOccurrence } from "../occurrences/occurrence.dto.js";
-import { occurrencePublicInclude } from "../occurrences/occurrence.service.js";
+import { activeOccurrence, occurrencePublicInclude } from "../occurrences/occurrence.service.js";
 import type { UpdateProfileBody } from "./profile.schemas.js";
 import { getUserReputation } from "./reputation.js";
 
@@ -30,11 +30,13 @@ export async function getMyProfile(userId: string) {
   const user = await findUserOrThrow(userId);
 
   const [occurrences, evaluationsGiven, reputation, recent] = await Promise.all([
-    prisma.occurrence.count({ where: { userId } }),
+    // Removidas pelo autor (D-032) não aparecem nem contam. A reputação continua contando os
+    // votos recebidos nelas: remover não "limpa" avaliações negativas.
+    prisma.occurrence.count({ where: { userId, ...activeOccurrence } }),
     prisma.evaluation.count({ where: { userId } }),
     getUserReputation(userId),
     prisma.occurrence.findMany({
-      where: { userId },
+      where: { userId, ...activeOccurrence },
       orderBy: newestFirst,
       take: PROFILE_RECENT_LIMIT,
       include: occurrencePublicInclude,
@@ -59,13 +61,13 @@ export async function getMyProfile(userId: string) {
 export async function listMyOccurrences(userId: string, skip: number, take: number) {
   const [items, total] = await Promise.all([
     prisma.occurrence.findMany({
-      where: { userId },
+      where: { userId, ...activeOccurrence },
       orderBy: newestFirst,
       skip,
       take,
       include: occurrencePublicInclude,
     }),
-    prisma.occurrence.count({ where: { userId } }),
+    prisma.occurrence.count({ where: { userId, ...activeOccurrence } }),
   ]);
 
   return { items: items.map((occurrence) => toPublicOccurrence({ occurrence })), total };

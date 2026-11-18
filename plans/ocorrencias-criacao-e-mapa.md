@@ -1,7 +1,7 @@
 ---
 status: implementado
 tema: ocorrências / geolocalização / mapa
-atualizado: 2026-11-14
+atualizado: 2026-11-17
 ---
 
 # Criação de ocorrências, localização e exibição no mapa
@@ -596,3 +596,365 @@ Agora:
 - Confirmar no iOS a ponta da cauda (`centerOffset`) nos tamanhos pequenos.
 - Ocorrências no mesmo ponto se sobrepõem de propósito, porque não há agrupamento. Hoje a de cima é a mais recente. As 2 ocorrências reais estão a ~7 m uma da outra: os pins só se separam por completo perto de z 20 (≈ 0,13 m por dp). A de baixo continua tocável pela parte visível e aparece na lista "perto de você".
 - Fluidez com centenas de ocorrências: cada troca de degrau re-renderiza todos os marcadores (um bitmap novo cada). Medir no aparelho.
+
+## 2026-11-17 — Mapa como 1ª aba, busca de endereço funcional e remoção da direção do usuário
+
+### Pedido (mensagem original)
+> ok, quero fazer algumas alterações no app, primeiro: a alteração de tela inicial ainda não subiu, a tela inicial agora deve ser o mapa e a tela de ocorrencias proximas deve ser outra tela com outro icone, segundo: a barra de pesquisar local hoje no app não funciona, tem apenas um place holder com a cidade de santos e quando o usuario tenta pesquisar algum endereço real não acontece nada. terceiro: pedi para adicionar um seta mostrando a direção que o usuario esta apontando no app, mas acho que nesse momento não faz sentido ja que o objetivo do app não é navegação nem nada do tipo
+
+### Pedido (prompt estruturado)
+
+# Ajustes no mapa do Cidade+: tela inicial, busca de endereço e direção do usuário
+
+## 1. Papel e objetivo
+Atue como engenheiro sênior de React Native/Expo (Expo Router, react-native-maps, expo-location), com atenção à experiência de uso e ao Figma do Cidade+.
+
+Quero três ajustes no app:
+1. o mapa deve ser **de fato** a tela inicial, inclusive na barra de navegação;
+2. a barra de busca do mapa deve encontrar endereços reais;
+3. a seta ou cone de direção do usuário deve ser removida, porque o app não é de navegação.
+
+**Modo: implementação**, seguindo o ciclo do `AGENTS.md`: plano antes do código, testes e documentação.
+
+O objetivo é terminar sabendo / tendo:
+- Por que a mudança de tela inicial "não subiu", e a correção.
+- O mapa como 1ª aba, com o ícone de início, e "ocorrências perto de você" como outra aba, com outro ícone.
+- Busca de endereço funcionando: digitar um endereço real e o mapa ir até ele.
+- O indicador do usuário sem direção (só posição e precisão), sem gastar bateria com a bússola.
+- Como levar isso ao celular: novo APK e/ou commit.
+
+## 2. Contexto
+- O mapa virou a rota inicial em 2026-11-14 (D-023), e o APK preview de 2026-11-15 aponta para a API no Railway.
+- O usuário ainda percebe "perto de você" como a tela inicial.
+- A busca mostra "Santos, SP" e não faz nada.
+- A seta de direção (D-021, estilo Waze) foi pedida antes, mas agora o usuário considera que não faz sentido.
+- Prazo: apresentação em 26/nov/2026.
+
+## 3. Auditoria (antes de mexer)
+- **Abas:** ordem, ícones e rótulos em `app/(tabs)/_layout.tsx` e `components/AppTabBar.tsx`; ícones do Figma em `assets/figma/nav-*.svg`.
+- **Busca:** comportamento atual em `app/(tabs)/index.tsx`.
+  - Existe placeholder ou é um valor fixo?
+  - Existe ação ao confirmar?
+  - Que serviço de geocodificação já está disponível (sem dependência nova nem chave paga)?
+  - Quais são os limites por plataforma?
+- **Direção:**
+  - onde a bússola é lida (`hooks/use-device-heading.ts`) e quem a usa;
+  - como o cone é desenhado (`MapCanvas`);
+  - o que depende de `course`/`heading`.
+- **Navegação existente:** links para `/nearby` e `/?focus=` ("Ver no mapa"), o botão voltar do Android (`backBehavior`).
+- Não presuma APIs: confira as versões instaladas.
+
+## 4. Tela inicial e abas
+- Mapa na 1ª posição, com o ícone de casa do Figma, aberto ao iniciar o app.
+- "Perto de você" em outra posição, com um ícone **diferente** da casa e do mapa, no mesmo estilo dos ícones do Figma (traço, tamanho, cor).
+- Rótulos de acessibilidade coerentes.
+- Preservar: o indicador da aba ativa, o "voltar" pelo histórico, o deep link `/?focus=` e o acesso a `/nearby` pela seta da busca.
+
+## 5. Busca de endereço
+- O campo começa **vazio**, com placeholder de verdade.
+- Ao confirmar no teclado (tecla "buscar"):
+  - geocodificar o endereço;
+  - mover o mapa até ele, em zoom de rua;
+  - marcar o ponto encontrado;
+  - parar de seguir o usuário.
+- Endereço sem cidade: priorizar Santos/SP. Endereço com cidade: respeitar o que foi digitado.
+- Mostrar o endereço resolvido (rua, número, bairro) quando houver.
+- Mensagens claras para:
+  - nada encontrado;
+  - erro ou sem internet;
+  - plataforma sem suporte (web).
+- Limpar a busca remove o marcador.
+- Sem dependência nova nem chave de API paga, se o que já existe resolver.
+- Não chamar o geocodificador a cada letra digitada (custo e limites).
+
+## 6. Direção do usuário
+- Remover a bússola e o cone/seta.
+- Manter o ponto azul e o círculo de precisão, "seguir" e "recentralizar".
+- Remover o código morto, sem afetar a localização usada na criação de ocorrências e em "perto de você".
+
+## 7. Restrições
+- Não mudar API, banco, schema, filtros, pins nem o modal de detalhes.
+- Não adicionar dependências.
+- Não quebrar o deep link `/?focus=`, o "voltar" do Android nem a criação de ocorrências.
+- Nada de segredos na documentação.
+
+## 8. Validação
+- `tsc` do app;
+- testes existentes do app;
+- bundle Android (`expo export`);
+- conferir na web: abas, campo vazio, mensagem de busca indisponível;
+- busca real e ausência da seta: só no aparelho, com o APK novo.
+
+## 9. Relatório final
+- Uma resposta para cada um dos 3 pedidos (causa e correção).
+- Arquivos alterados, testes e resultados, documentação atualizada, pendências.
+- Como levar ao celular (novo APK preview; commit).
+
+**Resultado esperado:** o app abre no mapa com a casa ativa na 1ª aba, "perto de você" tem um ícone próprio, buscar "Av. Ana Costa, 300" leva o mapa até lá, e o indicador do usuário mostra só a posição.
+
+### Auditoria (código, 2026-11-17)
+- **Abas:**
+  - `_layout.tsx` declara a ordem `nearby` (1º), `index` (2º), `create`, `notifications`, `account`;
+  - `AppTabBar` liga `nearby` → `nav-home.svg` (casa) e `index` → `nav-map.svg`;
+  - a rota inicial já é o mapa (`index`, D-023), mas **a casa (1ª aba) leva a "perto de você"**. Isso faz parecer que a mudança "não subiu";
+  - no Git, `origin/main` já tem o mapa em `index` (só 1 commit a mais, no README).
+- **Busca** (`app/(tabs)/index.tsx`):
+  - `useState("Santos, SP")` é um **valor inicial**, não um placeholder (o placeholder "Buscar endereço" nunca aparece);
+  - **não há `onSubmitEditing`** nem busca nenhuma;
+  - a seta à esquerda leva a `/nearby`.
+- **Geocodificação disponível:** `expo-location` 19.0.8 tem `geocodeAsync(endereço)` e `reverseGeocodeAsync(coordenadas)`.
+  - Geocodificador **nativo** do Android/iOS, sem chave e sem custo.
+  - **Não existe na web.**
+  - A documentação pede uso moderado: só ao confirmar, nunca por letra.
+- **Direção:**
+  - `useDeviceHeading` (só usado em `index.tsx`) assina `watchHeadingAsync`;
+  - sem bússola, cai no `course` do GPS em movimento;
+  - o `MapCanvas` desenha o cone (`userCone`) com `flat` e `rotation` no `UserLocationMarker`;
+  - `position.course` é usado só para a direção (fica no hook de localização, sem custo extra).
+
+### Estratégia
+1. **Abas:**
+   - ordem `index` (Mapa, ícone **casa**), `nearby` (Perto de você, ícone **novo** `nav-nearby.svg`), `create`, `notifications`, `account`;
+   - o ícone novo é um pin com um arco de "raio", no mesmo traço dos ícones do Figma (viewBox 60, stroke 2 `#222`). Não há ícone para isso no Figma; registrado como pendência de design;
+   - o `nav-map.svg` deixa de ser usado (fica no repositório; não apagar asset do Figma).
+2. **Busca:**
+   - campo vazio, com placeholder "Buscar endereço em Santos";
+   - `returnKeyType="search"` + `onSubmitEditing`;
+   - se a consulta não citar a cidade, acrescentar ", Santos - SP, Brasil";
+   - `geocodeAsync` → 1º resultado → `reverseGeocodeAsync` para o rótulo;
+   - `MapCanvas` recebe `searchTarget {latitude, longitude, key, label}`: anima até o zoom de rua e desenha um `Marker` nativo (sem View filha, P-013) com título;
+   - parar de seguir; teclado fechado;
+   - mensagens no aviso flutuante que já existe;
+   - na web: "A busca de endereço funciona no app (Android/iOS)".
+3. **Direção:**
+   - remover `useDeviceHeading` (e apagar o hook, código morto), a lógica de `direction`, a prop `userDirection` e o cone do `MapCanvas`;
+   - o indicador volta a ser o ponto azul + o círculo de precisão;
+   - D-021 parcialmente substituída por **D-030**.
+4. **Docs:**
+   - D-030;
+   - PROJECT_CONTEXT (rotas e abas, linha do mapa);
+   - este plano.
+
+### Resultado (2026-11-17)
+**Implementado:**
+- **Abas:**
+  - `app/(tabs)/_layout.tsx`: `index` (Mapa) é o 1º botão;
+  - `components/AppTabBar.tsx`: `index` → `nav-home.svg` (casa, "Início: mapa de ocorrências") e `nearby` → **`assets/figma/nav-nearby.svg`** (novo).
+- **Busca:**
+  - **`lib/address-search.ts`** (novo): `buildSearchQuery` e `formatAddressLabel`;
+  - `app/(tabs)/index.tsx`:
+    - campo vazio com placeholder "Buscar endereço em Santos";
+    - `returnKeyType="search"` + `onSubmitEditing`;
+    - `geocodeWithPermission` (pede permissão no Android e tenta de novo);
+    - endereço reverso para o rótulo;
+    - indicador de carregamento;
+    - limpar remove o marcador;
+    - mensagens: nada encontrado, sem internet, sem permissão, web;
+  - `components/MapCanvas.tsx`: prop `searchTarget` (anima uma vez por busca, `Marker` nativo com título);
+  - `MapCanvas.web.tsx`: prop aceita e ignorada.
+- **Direção:**
+  - removidos `useDeviceHeading`, a lógica de `direction`, a prop `userDirection`, o cone (`userCone`), `flat`/`rotation` do marcador do usuário;
+  - **`hooks/use-device-heading.ts` apagado**.
+
+**Testes executados:**
+
+| Teste | Resultado |
+|---|---|
+| `npx vitest run apps/mobile/lib` | **20/20** (12 marcadores + **8 novos** da busca). Os novos cobrem: Santos por padrão, cidade/UF respeitadas, CEP, "Santista" ≠ Santos, "RUA XV" e "12 ap" sem virar UF, e o rótulo. Um caso real ("ap" virando Amapá) foi pego pelo teste e corrigido |
+| `tsc --noEmit` (mobile) | OK |
+| `expo export --platform android` | OK (1477 módulos) |
+| Ícones lado a lado (Edge headless) | `nav-nearby` no mesmo traço e peso de `nav-home/report/notify/profile` |
+
+**Não testado (exige aparelho com o APK novo):**
+- a busca real com o geocodificador;
+- o pedido de permissão;
+- a animação e o marcador;
+- a ausência do cone;
+- a ordem das abas no celular.
+
+**Pendências:**
+- **Novo APK preview** para levar ao celular. O APK de 2026-11-15 não tem estas mudanças.
+- **Commit e push.**
+- **Ícone de "perto de você"** para o Figma (design).
+- **Busca na web:** sem geocodificador; só aviso.
+- **Melhorias possíveis:**
+  - mais de um resultado (o Android devolve 1);
+  - histórico de buscas.
+
+## 2026-11-17 — Tamanho dos marcadores por zoom, ocorrências sobrepostas e bolinha que não aparece
+
+### Pedido (mensagem original)
+> quero melhorar o tamanho dos icones conforme o usuario da zoom e tira o zoom , quando tem duas ocorrencias proximas elas ficam disputando espaco e se sobrepondo , e esta com um bug que nem todas as ocorrencias se transformam em ponto quando esta longe
+
+### Pedido (prompt estruturado)
+
+# Marcadores do mapa: tamanho por zoom, ocorrências sobrepostas e bug da bolinha — Cidade+
+
+## 1. Papel e objetivo
+Atue como engenheiro sênior de React Native/Expo com experiência em `react-native-maps` (Google Maps no Android, Apple Maps no iOS), renderização de marcadores e desempenho.
+
+Quero que os ícones das ocorrências acompanhem melhor o zoom, que ocorrências próximas não fiquem disputando o mesmo espaço e que **todas** virem bolinha quando o mapa estiver afastado.
+
+**Modo: implementação**, seguindo o ciclo do `AGENTS.md`.
+
+O objetivo é terminar tendo:
+- Ícones que crescem e diminuem de forma mais suave e proporcional ao zoom, com mínimo e máximo.
+- Ocorrências próximas legíveis e tocáveis individualmente, sem uma cobrir a outra e sem "piscar".
+- Todas as ocorrências, inclusive a que foi tocada ou está em foco, virando bolinha no zoom afastado.
+- A causa do bug explicada.
+
+## 2. Contexto
+- **Regras atuais (D-027):** ícone da categoria em z ≥ 12, de 28 a 52 dp em 7 degraus até z 17; bolinha de status abaixo de z 12; histerese.
+- **O usuário abandonou o agrupamento (clustering) e isso continua valendo:**
+  - não juntar marcadores;
+  - não exibir contador;
+  - não esconder ocorrências;
+  - cada ocorrência mantém o próprio marcador.
+- Bitmaps em vez de Views por causa do P-013 (cortes no Android).
+- Os dados reais do banco de dev têm 2 ocorrências a cerca de 7 m uma da outra, o caso de sobreposição.
+- O usuário testa pelo development build + Metro.
+
+## 3. Auditoria
+- **`components/MapCanvas.tsx`:** escolha da aparência (`markerLook`), selecionado, `zIndex`, `memo`/comparação, `key` dos `Marker`.
+- **`lib/map-markers.ts`:** níveis, tamanhos, histerese.
+- **`scripts/generate-pins.ps1`:** tamanhos gerados, peso dos PNGs.
+- **`app/(tabs)/index.tsx`:** quando `selectedId` é definido e limpo.
+- **Particularidades da biblioteca:**
+  - `anchor` (Google) × `centerOffset` (Apple);
+  - ordem de desenho com `zIndex` empatado;
+  - atualização da prop `image`.
+- Não presuma: confirme no código.
+
+## 4. Tamanho por zoom
+- Degraus menores (menos salto visual) numa faixa mais longa de zoom, com mínimo legível e máximo que não ocupe a tela.
+- Manter o limite ícone/bolinha (z 12) e a histerese.
+- Manter o peso dos bitmaps sob controle (informar o custo).
+
+## 5. Ocorrências próximas
+- Sem agrupar e sem esconder.
+- Ordem de desenho **estável**: nada de alternar quem fica por cima.
+- Quando dois ou mais ícones se sobrepõem **na tela** no zoom atual, afastá-los visualmente o mínimo necessário (leque), com uma linha fina até a posição real.
+  - É só visual: as coordenadas e os dados não mudam.
+  - Cada marcador continua tocável e abre a ocorrência certa.
+- Ao aproximar o zoom, quando deixarem de se sobrepor, voltam ao lugar exato.
+
+## 6. Bug da bolinha
+- Achar por que algumas ocorrências não viram bolinha e corrigir.
+- O selecionado também segue o zoom.
+- A seleção não deve ficar "presa" depois de fechar os detalhes.
+
+## 7. Restrições
+- Sem agrupamento.
+- Não mudar dados, API, banco, categorias, status nem coordenadas.
+- Não quebrar:
+  - foco ("Ver no mapa");
+  - seguir e recentralizar;
+  - busca de endereço;
+  - modal de detalhes.
+- Sem dependência nova.
+- Desempenho: o pan não recalcula nada; o recálculo acontece só quando o zoom muda.
+
+## 8. Validação
+- Testes unitários:
+  - tamanhos monotônicos com mínimo e máximo;
+  - histerese;
+  - leque: pares, grupos, nenhum perdido, determinístico, desempenho com 1000 pontos;
+  - bitmaps para toda combinação.
+- `tsc`, bundle Android e prancha visual dos tamanhos.
+- No aparelho, pelo usuário, com o dev build: zoom contínuo, as 2 ocorrências próximas, bolinhas de longe.
+
+## 9. Relatório final
+- Causa do bug.
+- Nova relação zoom × tamanho.
+- Como ficou a sobreposição.
+- Arquivos, testes, documentação e pendências.
+
+**Resultado esperado:** ao pinçar, os ícones mudam de tamanho em passos pequenos; as 2 ocorrências vizinhas aparecem lado a lado, ligadas ao ponto real; e, de longe, todas viram bolinhas coloridas.
+
+### Auditoria (código, 2026-11-17)
+- **Bug da bolinha:**
+  - `markerLook(selected=true)` devolve sempre o pin `sel` de 58 dp, ignorando o nível;
+  - em `index.tsx`, tocar num pin faz `setSelectedId` + `setDetailsId`, mas o `onClose` do modal só limpa `detailsId`, então **`selectedId` fica preso**;
+  - "Ver no mapa" também define `selectedId`;
+  - **resultado:** a última ocorrência tocada ou focada continua como pin grande em qualquer zoom.
+  - **Risco adicional no Android:** trocar a prop `image` do mesmo `Marker` entre formatos (pin com âncora na base ↔ bolinha centrada) depende de o mapa nativo aplicar o novo ícone e a nova âncora juntos. Remontar o marcador na troca de formato elimina essa dependência.
+- **Sobreposição:**
+  - todos os marcadores usam `zIndex={10}`; o Google Maps não garante a ordem entre empatados, e ela muda quando a imagem é trocada (troca de degrau). Daí a impressão de "disputa";
+  - nada afasta ícones sobrepostos: 7 m equivalem a cerca de 2 dp no zoom 15.
+- **Tamanho:**
+  - `MARKER_SIZES.pin = [28…52]` em 7 degraus de 4 dp, distribuídos entre z 12 e z 17 (cerca de 0,7 de zoom por degrau);
+  - acima de 17 fica fixo em 52.
+  - 344 PNGs (3,9 MB, @2x e @3x).
+
+### Estratégia
+1. **Tamanhos** (`lib/map-markers.ts` + gerador):
+   - pin de **24 a 54 dp em 11 degraus de 3 dp**, distribuídos entre **z 12 e z 18** (cerca de 0,55 de zoom por degrau);
+   - mínimo de 24, ainda reconhecível na prancha; máximo de 54;
+   - histerese mantida; bolinha de 10 a 14 sem mudança; selecionado de 58 → **60**, sempre maior que o maior normal;
+   - **custo estimado:** cerca de 500 PNGs (~6 MB).
+2. **Ordem estável:** `zIndex` por ordem de criação (a mais recente por cima), com o selecionado, o usuário e a busca acima de todos.
+3. **Leque visual** (`spreadOffsets`, função pura):
+   - no nível pin e no zoom quantizado (0,25), unir ícones cuja distância na tela seja menor que 0,8 × o tamanho;
+   - grupo de 2 ou 3 → em linha horizontal; grupo de 4 ou mais → em círculo;
+   - espaçamento de cerca de 0,95 × o tamanho, centrado no centroide;
+   - deslocamento aplicado via `anchor` (Android) e `centerOffset` (iOS);
+   - uma `Polyline` fina liga a ponta do pin à coordenada real;
+   - no nível bolinha não há leque (bolinhas pequenas; sobreposição aceitável);
+   - o pan não recalcula; o recálculo só acontece quando o zoom quantizado muda.
+4. **Bug:**
+   - o selecionado segue o nível (bolinha maior no nível bolinha, pin de 60 no nível pin);
+   - `onClose` do modal limpa `selectedId`;
+   - a `key` do `Marker` inclui o formato, o que força a remontagem ao trocar pin ↔ bolinha.
+5. **Desempenho:**
+   - aparências memoizadas por id;
+   - comparação por valor (imagem e âncora);
+   - recálculo só na troca de degrau ou de zoom quantizado.
+6. **Docs:** D-031 (atualiza a D-027), este plano e o PROJECT_CONTEXT.
+
+### Resultado (2026-11-17)
+**Implementado:**
+- **`lib/map-markers.ts`:**
+  - `MARKER_SIZES.pin` de 24 a 54 (3 em 3) até z 18;
+  - `SELECTED_PIN_SIZE` = 60;
+  - novos: `quantizeZoom`, `project`/`unproject` e **`spreadOffsets`** (união-busca com grade espacial; linha ou círculo).
+- **`scripts/generate-pins.ps1`:** novos tamanhos, regerados (**504 PNGs, 5,6 MB**); `lib/pin-images.ts` regenerado.
+- **`components/MapCanvas.tsx`:**
+  - zoom quantizado em estado; leque só no nível pin;
+  - `Polyline` até o ponto real;
+  - `zIndex` único por ordem de criação;
+  - selecionado no mesmo laço, seguindo o nível;
+  - `key` com o formato;
+  - `sameMarker` compara por valor;
+  - `UserLocationMarker` com `zIndex` acima das ocorrências.
+- **`app/(tabs)/index.tsx`:** fechar o modal limpa `selectedId`.
+
+**Testes:**
+
+| Teste | Resultado |
+|---|---|
+| `npx vitest run apps/mobile/lib` | **26/26**, incluindo 6 novos do leque: |
+| | • as 2 ocorrências reais (~7 m) lado a lado no zoom de rua |
+| | • voltam ao lugar ao aproximar |
+| | • grupo de 6 sem sobreposição e nenhum perdido |
+| | • determinístico |
+| | • encadeamento |
+| | • 1000 pontos < 80 ms |
+| | Também: degraus ≤ 3 dp, mínimo 24 e máximo 54, bitmaps de toda combinação |
+| `tsc --noEmit` (mobile) | OK |
+| `expo export --platform android` | OK |
+| Prancha dos 11 tamanhos + selecionado | Progressão suave; 24 dp ainda legível |
+
+**Não testado (aparelho):**
+- sensação do zoom contínuo;
+- leque com as 2 ocorrências reais;
+- todas virando bolinha;
+- toque correto em cada marcador do leque;
+- iOS (`centerOffset`).
+
+**Limitação conhecida:** a linha do leque é calculada no zoom quantizado. Entre dois quantum, o comprimento na tela varia até cerca de 9%; a ponta da linha pode ficar alguns dp fora da ponta do pin até o próximo recálculo.
+
+**Pendências:**
+- validar com o dev build (o usuário está testando local);
+- calibrar `OVERLAP_FACTOR`/`SPREAD_SPACING` e os tamanhos;
+- novo APK preview depois de validar.
+

@@ -103,6 +103,8 @@ model Occurrence {
   userId        String
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
+  /// Remoção suave pelo autor (D-032): some do app, mas avaliações e histórico ficam. null = ativa.
+  deletedAt     DateTime?
 
   category      Category                  @relation(fields: [categoryId], references: [id])
   subcategory   Subcategory?              @relation(fields: [subcategoryId], references: [id], onDelete: Restrict)

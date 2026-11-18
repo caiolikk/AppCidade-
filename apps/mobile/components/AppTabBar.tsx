@@ -5,16 +5,19 @@ import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { SvgProps } from "react-native-svg";
 import NavHome from "../assets/figma/nav-home.svg";
-import NavMap from "../assets/figma/nav-map.svg";
+import NavNearby from "../assets/figma/nav-nearby.svg";
 import NavNotify from "../assets/figma/nav-notify.svg";
 import NavProfile from "../assets/figma/nav-profile.svg";
 import NavReport from "../assets/figma/nav-report.svg";
 import { colors } from "../theme";
 
-/** Chave = nome da rota em `app/(tabs)`. O mapa é a rota `index` (tela inicial, D-023). */
+/**
+ * Chave = nome da rota em `app/(tabs)`. O mapa é a rota `index`: tela inicial e 1º botão,
+ * com o ícone de casa (D-023/D-030). "Perto de você" tem ícone próprio (não há no Figma).
+ */
 const ICONS: Record<string, { Icon: FC<SvgProps>; label: string }> = {
-  nearby: { Icon: NavHome, label: "Ocorrências perto de você" },
-  index: { Icon: NavMap, label: "Mapa" },
+  index: { Icon: NavHome, label: "Início: mapa de ocorrências" },
+  nearby: { Icon: NavNearby, label: "Ocorrências perto de você" },
   create: { Icon: NavReport, label: "Nova ocorrência" },
   notifications: { Icon: NavNotify, label: "Notificações" },
   account: { Icon: NavProfile, label: "Minha conta" },

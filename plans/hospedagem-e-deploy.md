@@ -733,3 +733,48 @@ Os nomes exatos dos campos do painel podem variar um pouco. O que importa são o
 - **Pendente:**
   - EAS;
   - teste ponta a ponta.
+
+### Teste ponta a ponta em produção (2026-11-15) — 14/14 OK
+Script fora do repositório, contra a URL pública, com usuário e ocorrência "TESTE E2E" **apagados no final** (banco e Cloudinary):
+
+| Verificação | Resultado |
+|---|---|
+| Cadastro com CEP de Santos (ViaCEP a partir do Railway) | OK, bairro Ponta da Praia (1,5 s: ViaCEP + bcrypt) |
+| Login | OK |
+| Upload de foto | OK, `res.cloudinary.com` (0,5 s); `publicId` do Cloudinary, não `local-*` |
+| Criar ocorrência / detalhe público sem autor e CPF / aparece na lista | OK (0,24 s / — / 0,15 s) |
+| Miniatura pela CDN do Cloudinary | 200 `image/png` |
+| Avaliação comunitária | OK |
+| Foto de perfil PUT e DELETE `/me/avatar` | OK (Cloudinary; a remoção apaga o arquivo) |
+| `GET /me/profile` (indicadores) e `PATCH /me` | OK |
+| Limpeza | 0 usuários de teste, 0 ocorrências, 0 arquivos em `cidade-plus/` no Cloudinary |
+
+**Estado:** a infraestrutura de produção (Railway + Neon + Cloudinary) está funcional. Falta o app apontar para ela (EAS).
+
+### Próximos passos (ordem)
+**Antes de 26/nov:**
+1. Decidir o **domínio próprio** (opcional). Depois, cadastrar `EXPO_PUBLIC_API_URL` no EAS (`preview`) e gerar o APK preview.
+2. Teste no celular com o APK: cadastro, ocorrência com foto, mapa, perfil.
+3. **Gerar um novo API secret do Cloudinary** e atualizar `CLOUDINARY_API_SECRET` no Railway via `--stdin`.
+4. Commit do `.railwayignore` e deste plano.
+
+**Quando o Caio puder:**
+5. Instalar o app do Railway ou mover o repositório para uma organização. Depois:
+   - ligar a fonte do serviço ao GitHub (`main`), watch paths e "Wait for CI";
+   - Secrets do backup;
+   - proteção da `main`.
+
+**Depois:**
+6. Primeiro backup e teste de restauração.
+7. Monitor externo em `/health/ready`.
+8. Rate limit, refresh token, `expo-updates`, imagem Docker menor e painel admin.
+
+### App apontando para produção (2026-11-15)
+- EAS `preview`: `EXPO_PUBLIC_API_URL=https://api-production-93485227.up.railway.app` (plaintext), ao lado da `GOOGLE_MAPS_ANDROID_API_KEY` já existente.
+- Build Android preview `e0dd9117-c2bf-4034-af62-02d1a7a79fea`: **FINISHED** (2026-11-15). APK distribuído pelo link do EAS. Falta o teste no celular.
+- **Como trocar para o domínio próprio depois** (o endereço `*.up.railway.app` continua funcionando junto):
+  1. Railway → serviço `api` → *Custom Domain* `api.<dominio>` (ou `railway domain api.<dominio> -s api`) → criar o CNAME indicado no DNS → aguardar o certificado. Testar `https://api.<dominio>/health/ready`.
+  2. `eas env:set` (o `env:create` foi descontinuado): `EXPO_PUBLIC_API_URL=https://api.<dominio>` no `preview`.
+  3. Novo build preview. A URL vai **dentro** do APK, então quem tem o APK antigo segue no endereço do Railway até instalar o novo (ou até existir o `expo-updates`).
+  4. Só remover o domínio `*.up.railway.app` quando ninguém mais usar APKs antigos.
+

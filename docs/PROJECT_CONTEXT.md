@@ -86,17 +86,18 @@ AppCidade-/
 | PATCH | `/me` (`name`, `cep`) · PUT/DELETE `/me/avatar` | autenticado (só o próprio usuário) |
 | GET | `/manager/health` · `/admin/health` | MANAGER+ · ADMIN |
 | GET | `/categories` | público (com `subcategories[]`) |
-| GET | `/occurrences` · `/occurrences/:id` | público (DTO sem dados pessoais) |
+| GET | `/occurrences` · `/occurrences/:id` | público (DTO sem dados pessoais; o detalhe com login traz `viewer: { isAuthor, canEdit }`, D-032). Removidas não aparecem |
 | POST | `/occurrences` | autenticado (geofence só com a flag D-018) |
 | POST | `/occurrences/geofence-check` | autenticado (mantido; o app não usa mais) |
 | POST | `/occurrences/:id/evaluations` | autenticado |
+| PATCH · DELETE | `/occurrences/:id` (editar parcial · remoção suave) | só o **autor** e só "em análise" (403/409/404, D-032) |
 | GET | `/admin/occurrences/:id` | MANAGER/ADMIN |
 | PATCH | `/admin/occurrences/:id/status` | MANAGER/ADMIN |
 | POST | `/uploads/image` | autenticado (multipart `file`, máx. 8 MB) |
 
 ### Modelo de dados (`prisma/schema.prisma`)
 
-`User` (role, cpf, cep, neighborhood, santosNeighborhoodId, `avatarUrl?`, `avatarPublicId?`, reputationScore **sem uso**) · `Category` · `Subcategory` (categoryId, name, description, sortOrder) · `Occurrence` (title, description, lat/lng, status, `subcategoryId?`) · `OccurrenceMedia` (url, thumbnailUrl, publicId) · `SantosNeighborhood` (geom `Polygon 4326` + índice GIST) · `Evaluation` (unique userId+occurrenceId) · `OccurrenceStatusHistory`. Migrations: `20260823224831_foundation`, `20261115003036_subcategories` e `20261115005535_user_avatar` (as duas últimas aditivas).
+`User` (role, cpf, cep, neighborhood, santosNeighborhoodId, `avatarUrl?`, `avatarPublicId?`, reputationScore **sem uso**) · `Category` · `Subcategory` (categoryId, name, description, sortOrder) · `Occurrence` (title, description, lat/lng, status, `subcategoryId?`, `deletedAt?` = removida pelo autor, D-032) · `OccurrenceMedia` (url, thumbnailUrl, publicId) · `SantosNeighborhood` (geom `Polygon 4326` + índice GIST) · `Evaluation` (unique userId+occurrenceId) · `OccurrenceStatusHistory`. Migrations: `20260823224831_foundation`, `20261115003036_subcategories` `20261115005535_user_avatar` e `20261118020421_occurrence_soft_delete` (todas depois da primeira são aditivas).
 
 ## 5. Estado das funcionalidades (conferido no código em 2026-11-14)
 
@@ -107,8 +108,9 @@ AppCidade-/
 | Geofencing PostGIS | Implementado, **desligado** | Flag `OCCURRENCE_GEOFENCE_ENABLED` (D-018). Seed tem só Gonzaga e Ponta da Praia (bboxes **aproximados**) |
 | Criar ocorrência (foto + local) | Implementado e testado (API + banco) | `(tabs)/create.tsx`: GPS **ou** ponto escolhido no mapa (`LocationPicker`); qualquer local. Ver [[ocorrencias-criacao-e-mapa]] |
 | Upload de imagem | Implementado | Local em `apps/api/uploads` ou Cloudinary |
-| Lista "perto de você" (`/nearby`) | Implementado (validado na web) | Acessada pela navbar (casa); **não** é mais a tela inicial (D-023). **Grade 3×N do Figma** com ilustração da categoria + título + distância (sem foto). Raio de 5 km (`lib/geo.ts`), por distância. Sem localização: todas, com aviso. D-021 |
-| Mapa (**tela inicial**, rota `/`) | Implementado (validado na web; falta o aparelho) | **Todas** as ocorrências; um marcador **por ocorrência** (sem agrupamento): **ícone da categoria** que diminui ao afastar (28–52 dp, z ≥ 12) e **bolinha do status** só bem afastado (z < 12); bitmaps de `scripts/generate-pins.ps1` (P-013, D-027; limites em `lib/map-markers.ts`); usuário com precisão e direção (bússola); seguir/recentralizar. "Ver no mapa"/criação abrem `/?focus=<id>&focusKey=<nonce>` (foco tem prioridade sobre seguir) |
+| Lista "perto de você" (`/nearby`) | Implementado (validado na web) | **2º botão** da navbar, com ícone próprio (`nav-nearby.svg`); **não** é a tela inicial (D-023/D-030). **Grade 3×N do Figma** com ilustração da categoria + título + distância (sem foto). Raio de 5 km (`lib/geo.ts`), por distância. Sem localização: todas, com aviso. D-021 |
+| Mapa (**tela inicial**, rota `/`) | Implementado (validado na web; falta o aparelho) | **Todas** as ocorrências; um marcador **por ocorrência** (sem agrupamento): **ícone da categoria** que diminui ao afastar (24–54 dp em degraus de 3 dp, z 12–18) e **bolinha do status** só bem afastado (z < 12), inclusive o selecionado; ícones sobrepostos se abrem em **leque visual** ligado ao ponto real, com ordem de desenho estável; bitmaps de `scripts/generate-pins.ps1` (P-013, D-027/D-031; limites em `lib/map-markers.ts`); **1º botão da navbar (casa)**; **busca de endereço** pelo geocodificador nativo (`lib/address-search.ts`, só Android/iOS, D-030); usuário com ponto + precisão, **sem direção** (D-030); seguir/recentralizar. "Ver no mapa"/criação abrem `/?focus=<id>&focusKey=<nonce>` (foco tem prioridade sobre seguir) |
+| Editar / remover a própria ocorrência | Implementado (API testada; falta o aparelho) | Só o autor e só "em análise"; remoção suave (votos e histórico ficam, fotos apagadas). Formulário compartilhado `components/OccurrenceForm`, rota `occurrence/edit/[id]`. Ver [[ocorrencias-edicao-e-remocao]], D-032 |
 | Relação ocorrência → bairro | Não existe | O bairro só existe no usuário |
 | Detalhe + avaliação comunitária | Implementado | **Modal único** `OccurrenceDetailsModal`/`OccurrenceDetails` (Home e mapa) e rota `/occurrence/[id]`. Só 1 foto pública (`thumbnailUrl`) |
 | Mudança de status (API admin) | Implementado | Sem tela: não existe painel web nem tela de gestor |
@@ -122,7 +124,7 @@ AppCidade-/
 
 - **Cadastro:** `auth.service.ts` → `cep/resolve-address.ts` → `services/viacep.ts` (CEP de 8 dígitos, UF=SP, cidade=Santos, bairro normalizado) → busca `SantosNeighborhood.normalizedName`. Se não houver polígono, `santosNeighborhoodId = null`.
 - **Criar ocorrência:** GPS (`expo-location`) ou toque/arraste no `components/LocationPicker(.web).tsx` (6 casas) → foto → `POST /uploads/image` → `POST /occurrences` (Zod: título/descrição ≥3, lat ±90, lng ±180, categoria uuid, subcategoria da categoria (D-022), `media.min(1)`) → transação `occurrence + media + statusHistory(REPORTADA)` → app invalida `["occurrences"]` e abre `/?focus=<id>`. Com a flag D-018 ligada, `geofencing.ts` volta a dar 403 fora / 422 sem polígono.
-- **Mapa (tela inicial):** `(tabs)/index.tsx` + `components/MapCanvas(.web).tsx` (pins, `focusId`, seguir/recentralizar) + `hooks/use-feed.ts` (React Query `["occurrences"]`, `GET /occurrences`). Localização: `hooks/use-user-location.ts` (só foreground, só com a aba em foco) e `hooks/use-device-heading.ts` (bússola suavizada).
+- **Mapa (tela inicial):** `(tabs)/index.tsx` + `components/MapCanvas(.web).tsx` (pins, `focusId`, seguir/recentralizar) + `hooks/use-feed.ts` (React Query `["occurrences"]`, `GET /occurrences`). Localização: `hooks/use-user-location.ts` (só foreground, só com a aba em foco) (a bússola foi removida, D-030).
 - **Detalhes:** Home e mapa → `components/OccurrenceDetailsModal.tsx` (lê o cache da lista, sem requisição extra) → `OccurrenceDetails.tsx` (também usado pela rota `/occurrence/[id]`).
 - **Seed:** cria categorias, bairros e staff; **remove** ocorrências fictícias (mídia `publicId seed-*`). Não cria mais ocorrências.
 

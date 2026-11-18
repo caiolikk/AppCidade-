@@ -1,7 +1,7 @@
 ---
 status: implementado
 tema: processo / documentação / agentes
-atualizado: 2026-11-13
+atualizado: 2026-11-17
 ---
 
 # Segundo cérebro do Cidade+ (Obsidian + Cursor/Claude)
@@ -97,3 +97,68 @@ Executados em 2026-11-13 seguindo apenas o roteiro do `AGENTS.md` (PROJECT_CONTE
 
 **Métricas:** cada busca grep levou ~0,03 s. Contexto fixo por conversa: `AGENTS.md` (~5,4 KB) + `PROJECT_CONTEXT.md` (~8 KB), cerca de 13 KB contra ~68 KB da base inteira. Uma pergunta típica consome o Nível 1 + 1 trecho de documento + 1 a 2 arquivos de código. A auditoria de 25 KB só precisa ser aberta por seção.
 **Conferido no código:** lista pública sem `take` (sem paginação); o cadastro chama `resolveResidentialAddress` e força `CITIZEN`; feed e mapa filtram por categoria no cliente; o seed tem Gonzaga e Ponta da Praia.
+
+## 2026-11-17 — Melhorar todo prompt de tarefa antes de executar
+
+### Pedido
+O usuário quer que **todo prompt de tarefa** enviado ao agente seja primeiro **reescrito num prompt estruturado e detalhado** e só então executado. O modelo é o exemplo "Planejamento de hospedagem, arquitetura de repositórios e CI/CD do Cidade+", criado a partir de uma mensagem curta e informal. Vale para os próximos prompts, no Claude Code e no Cursor.
+
+### Auditoria
+- Hoje o `AGENTS.md` (seção "Formato dos prompts") só manda **extrair** as seções implícitas e registrá-las no plano. Não há reescrita explícita nem modelo detalhado.
+- O `docs/PROMPT_TEMPLATE.md` (2026-11-13) tem 10 seções curtas (papel → relatório). O exemplo do usuário é bem mais rico:
+  - "O objetivo é terminar esta etapa sabendo…";
+  - auditoria por camada;
+  - perguntas numeradas;
+  - critérios de comparação em tabela;
+  - "não invente / não presuma";
+  - entregável com seções;
+  - diferenciar código × pesquisa × recomendação × decisão;
+  - restrições obrigatórias por modo (só planejamento × implementação);
+  - relatório final;
+  - "resultado esperado".
+- Não existe pasta `.claude/` no cofre nem no repositório: nenhuma skill de projeto.
+  - As sessões do Claude Code abrem em `cidade+/` (cofre), fora do Git.
+  - O Cursor lê `.cursor/rules/segundo-cerebro.mdc`, que aponta para o `AGENTS.md`.
+
+### Estratégia
+1. **`AGENTS.md`:** reescrever a seção "Formato dos prompts" com a regra nova (o `AGENTS.md` vale para os dois agentes e é a fonte única das regras).
+2. **`docs/PROMPT_TEMPLATE.md`:** novo modelo detalhado, derivado do exemplo, com variações por modo. O modelo antigo fica como versão curta para tarefas pequenas.
+3. **`docs/prompts/exemplo-hospedagem.md`:** o par "mensagem original → prompt melhorado", como referência de qualidade.
+4. **Skill `melhorar-prompt`:**
+   - versionada em `AppCidade-/.claude/skills/melhorar-prompt/SKILL.md`, com o procedimento;
+   - um ponteiro mínimo em `cidade+/.claude/skills/melhorar-prompt/SKILL.md`, porque é onde as sessões abrem.
+   - Sem duplicar conteúdo.
+5. **Escopo da regra:**
+   - **vale para tarefas**: código, plano, pesquisa, documentação, configuração, deploy, decisão técnica;
+   - **não vale para conversa**: perguntas rápidas, confirmações ("ok", "pronto"), "e agora?", escolha entre opções já apresentadas. Reescrever isso só atrasaria.
+6. **Onde o prompt melhorado fica:**
+   - o **prompt completo** vai para o plano do tema ("Pedido (prompt estruturado)") **antes** de agir;
+   - **no chat**, um resumo curto da interpretação (objetivo, modo, escopo, entregáveis, restrições), e a execução segue no mesmo turno;
+   - **só pergunta** se algo mudar o resultado (ex.: não dá para saber se é só planejar ou implementar).
+7. **Regras ao melhorar:**
+   - preservar a intenção e **todas** as perguntas do usuário;
+   - não adicionar escopo que ele não pediu;
+   - herdar as regras do `AGENTS.md` (segurança, `.env`, plano antes do código);
+   - o modo (planejar × implementar) é inferido das palavras do usuário.
+
+### Arquivos previstos
+- `AGENTS.md`
+- `docs/PROMPT_TEMPLATE.md`
+- `docs/prompts/exemplo-hospedagem.md` (novo)
+- `.claude/skills/melhorar-prompt/SKILL.md` (novo)
+- `../.claude/skills/melhorar-prompt/SKILL.md` (ponteiro no cofre, fora do Git)
+- `docs/DECISIONS.md` (D-029)
+- este plano
+
+### Resultado (2026-11-17)
+- **`AGENTS.md`:** a seção "Formato dos prompts" foi reescrita com a regra nova (escopo, como, onde fica, quando perguntar).
+- **`docs/PROMPT_TEMPLATE.md`:** modelo detalhado derivado do exemplo + modelo curto.
+- **`docs/prompts/exemplo-hospedagem.md`:** mensagem original → prompt melhorado, com notas do que observar.
+- **`.claude/skills/melhorar-prompt/SKILL.md`** (versionada): procedimento (classificar → reescrever → registrar e executar) + checagem.
+- **`cidade+/.claude/skills/melhorar-prompt/SKILL.md`:** ponteiro, fora do Git.
+- **D-029** em `DECISIONS.md`.
+- **Validação:**
+  - a skill só aparece na lista do Claude Code numa **sessão nova** (ou depois de recarregar);
+  - o comportamento será conferido no próximo prompt de tarefa do usuário.
+- **Pendência:** o `.cursor/rules/segundo-cerebro.mdc` não precisou mudar, porque aponta para o `AGENTS.md`.
+

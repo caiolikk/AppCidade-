@@ -68,6 +68,11 @@ export type PublicOccurrence = {
     total: number;
   };
   createdAt: string;
+  /**
+   * Só no detalhe (`GET /occurrences/:id` com login, D-032): se quem vê é o autor e se ainda
+   * pode editar/remover (enquanto "em análise"). O autor em si nunca vem no DTO público.
+   */
+  viewer?: { isAuthor: boolean; canEdit: boolean };
 };
 
 export type EvaluationType = "UTIL" | "PERSISTE" | "INCORRETA";

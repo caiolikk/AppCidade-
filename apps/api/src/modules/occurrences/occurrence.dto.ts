@@ -67,5 +67,7 @@ export function toAdminOccurrence(input: {
       createdAt: item.createdAt,
     })),
     updatedAt: input.occurrence.updatedAt,
+    /** Removida pelo autor (D-032); só a visão do gestor/admin mostra. */
+    deletedAt: input.occurrence.deletedAt,
   };
 }

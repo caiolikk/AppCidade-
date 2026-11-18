@@ -37,6 +37,7 @@ function RootNavigator() {
       <Stack.Protected guard={Boolean(token)}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="occurrence/[id]" />
+        <Stack.Screen name="occurrence/edit/[id]" />
         <Stack.Screen name="settings" />
       </Stack.Protected>
       <Stack.Protected guard={!token}>

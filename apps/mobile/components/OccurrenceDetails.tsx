@@ -1,6 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useOccurrence } from "../hooks/use-feed";
+import { profileKey } from "../hooks/use-profile";
 import { api, ApiError } from "../lib/api";
 import { EVALUATION_LABEL, formatReportedAgo } from "../lib/format";
 import { distanceKm, formatDistance, type LatLng } from "../lib/geo";
@@ -18,7 +21,27 @@ type OccurrenceDetailsProps = {
   userPosition?: LatLng | null;
   /** Mostra o botão "Ver no mapa". */
   onShowOnMap?: () => void;
+  /** Antes de abrir a edição (o modal fecha para a tela de edição aparecer). */
+  onLeave?: () => void;
+  /** Depois de remover (fechar o modal ou voltar da rota). */
+  onRemoved?: () => void;
 };
+
+/** Confirmação de ação destrutiva: `Alert` no app; `window.confirm` na web (o Alert não tem botões lá). */
+function confirmRemoval(): Promise<boolean> {
+  const title = "Remover ocorrência?";
+  const message =
+    "Ela sai do mapa e do seu perfil, e a foto é apagada. Essa ação não pode ser desfeita.";
+  if (Platform.OS === "web") {
+    return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? false);
+  }
+  return new Promise((resolve) => {
+    Alert.alert(title, message, [
+      { text: "Cancelar", style: "cancel", onPress: () => resolve(false) },
+      { text: "Remover", style: "destructive", onPress: () => resolve(true) },
+    ]);
+  });
+}
 
 /**
  * Conteúdo de detalhes da ocorrência — o MESMO usado no modal (Home e mapa) e na rota
@@ -26,8 +49,21 @@ type OccurrenceDetailsProps = {
  * uma única foto pública (`thumbnailUrl`); a original fica protegida (D-006/D-011).
  * Renderize com `key={occurrence.id}` para não herdar estado de outra ocorrência.
  */
-export function OccurrenceDetails({ occurrence, userPosition, onShowOnMap }: OccurrenceDetailsProps) {
+export function OccurrenceDetails({
+  occurrence,
+  userPosition,
+  onShowOnMap,
+  onLeave,
+  onRemoved,
+}: OccurrenceDetailsProps) {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  // `viewer` (autor? pode editar?) vem do detalhe com login (D-032); o modal recebe a
+  // ocorrência da lista pública, que não tem essa informação.
+  const detailQuery = useOccurrence(occurrence.id);
+  const viewer = occurrence.viewer ?? detailQuery.data?.viewer;
+  const [removing, setRemoving] = useState(false);
+  const [authorError, setAuthorError] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
   const [voting, setVoting] = useState<EvaluationType | null>(null);
   const [voted, setVoted] = useState<EvaluationType | null>(null);
@@ -49,6 +85,33 @@ export function OccurrenceDetails({ occurrence, userPosition, onShowOnMap }: Occ
       );
     } finally {
       setVoting(null);
+    }
+  }
+
+  function openEdit() {
+    onLeave?.();
+    router.push({ pathname: "/occurrence/edit/[id]", params: { id: occurrence.id } });
+  }
+
+  async function remove() {
+    if (removing || !(await confirmRemoval())) return;
+    setAuthorError(null);
+    setRemoving(true);
+    try {
+      await api(`/occurrences/${occurrence.id}`, { method: "DELETE" });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["occurrences"] }),
+        queryClient.invalidateQueries({ queryKey: profileKey }),
+      ]);
+      onRemoved?.();
+    } catch (caught) {
+      setAuthorError(
+        caught instanceof ApiError ? caught.message : "Não foi possível remover a ocorrência.",
+      );
+      // A situação pode ter mudado (ex.: o gestor assumiu): recarrega o `viewer`.
+      void detailQuery.refetch();
+    } finally {
+      setRemoving(false);
     }
   }
 
@@ -125,6 +188,43 @@ export function OccurrenceDetails({ occurrence, userPosition, onShowOnMap }: Occ
         })}
       </View>
       {voteError ? <Text style={styles.error}>{voteError}</Text> : null}
+
+      {/* Só para o autor (D-032): editar/remover enquanto "em análise"; depois, só o aviso. */}
+      {viewer?.isAuthor ? (
+        <>
+          <Text style={styles.section}>Sua ocorrência</Text>
+          {viewer.canEdit ? (
+            <>
+              <PrimaryButton
+                label="Editar ocorrência"
+                variant="secondary"
+                onPress={openEdit}
+                disabled={removing}
+              />
+              <Pressable
+                onPress={() => void remove()}
+                disabled={removing}
+                accessibilityRole="button"
+                accessibilityLabel="Remover ocorrência"
+                style={({ pressed }) => [styles.remove, pressed && styles.pressed]}
+              >
+                <Text style={styles.removeText}>
+                  {removing ? "Removendo…" : "Remover ocorrência"}
+                </Text>
+              </Pressable>
+              <Text style={styles.meta}>
+                Você pode editar ou remover enquanto ela estiver em análise.
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.body}>
+              Esta ocorrência já está sendo tratada pela prefeitura e não pode mais ser editada
+              nem removida.
+            </Text>
+          )}
+          {authorError ? <Text style={styles.error}>{authorError}</Text> : null}
+        </>
+      ) : null}
     </View>
   );
 }
@@ -235,5 +335,15 @@ const styles = StyleSheet.create({
   error: {
     color: colors.error,
     marginTop: 12,
+  },
+  remove: {
+    alignItems: "center",
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+  removeText: {
+    color: colors.error,
+    fontSize: 15,
+    fontWeight: "700",
   },
 });
